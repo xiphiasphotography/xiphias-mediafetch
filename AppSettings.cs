@@ -23,6 +23,11 @@ internal sealed class AppSettings
     public string? LastSourceDirectory { get; set; }
     public string? LastDestinationDirectory { get; set; }
     public string UserAgent { get; set; } = DefaultUserAgent;
+    public int? WindowX { get; set; }
+    public int? WindowY { get; set; }
+    public int? WindowWidth { get; set; }
+    public int? WindowHeight { get; set; }
+    public bool WindowMaximized { get; set; }
 
     public static AppSettings Load()
     {

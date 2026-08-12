@@ -9,7 +9,7 @@ internal sealed class AboutDialog : Form
     public AboutDialog()
     {
         Text = "Over XiPHiAS MediaFetch";
-        ClientSize = new Size(640, 430);
+        ClientSize = new Size(640, 464);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -86,12 +86,26 @@ internal sealed class AboutDialog : Form
         var closeButton = new Button
         {
             Text = "Sluiten",
-            Width = 100,
-            Height = 34,
-            Left = 480,
-            Top = 382,
+            Dock = DockStyle.Fill,
+            AutoSize = false,
+            MinimumSize = new Size(110, 40),
+            Margin = new Padding(10, 18, 20, 6),
             DialogResult = DialogResult.OK
         };
+
+        var buttonPanel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 70,
+            ColumnCount = 2,
+            RowCount = 1,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        buttonPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        buttonPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
+        buttonPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        buttonPanel.Controls.Add(closeButton, 1, 0);
 
         AcceptButton = closeButton;
         CancelButton = closeButton;
@@ -99,7 +113,7 @@ internal sealed class AboutDialog : Form
             logo,
             version,
             detailsLayout,
-            closeButton
+            buttonPanel
         ]);
     }
 

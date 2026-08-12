@@ -39,6 +39,8 @@ public sealed class Downloader : IDisposable
         CancellationToken cancellationToken = default)
     {
         const int maxRetries = 3;
+        var downloadUrl = item.Url;
+        var correctedUrl = CorrectUrlEncoding(item.Url);
 
         for (var attempt = 1; attempt <= maxRetries; attempt++)
         {
@@ -46,6 +48,7 @@ public sealed class Downloader : IDisposable
             {
                 await DownloadInternalAsync(
                     item,
+                    downloadUrl,
                     progress,
                     cancellationToken
                 );
@@ -60,9 +63,24 @@ public sealed class Downloader : IDisposable
             }
             catch (Exception ex)
             {
+                var canTryCorrectedUrl =
+                    attempt == 1 &&
+                    !string.Equals(
+                        correctedUrl,
+                        item.Url,
+                        StringComparison.Ordinal
+                    );
+
+                if (canTryCorrectedUrl)
+                {
+                    downloadUrl = correctedUrl;
+                }
+
                 item.Status =
                     attempt < maxRetries
-                        ? $"Retry {attempt}/{maxRetries}"
+                        ? canTryCorrectedUrl
+                            ? "URL gecorrigeerd, opnieuw proberen"
+                            : $"Retry {attempt}/{maxRetries}"
                         : $"Failed: {ex.Message}";
 
                 progress?.Report(item);
@@ -70,10 +88,13 @@ public sealed class Downloader : IDisposable
                 if (attempt >= maxRetries)
                     throw;
 
-                await Task.Delay(
-                    TimeSpan.FromSeconds(attempt * 2),
-                    cancellationToken
-                );
+                if (!canTryCorrectedUrl)
+                {
+                    await Task.Delay(
+                        TimeSpan.FromSeconds(attempt * 2),
+                        cancellationToken
+                    );
+                }
             }
         }
     }
@@ -117,6 +138,7 @@ public sealed class Downloader : IDisposable
 
     private async Task DownloadInternalAsync(
         DownloadItem item,
+        string downloadUrl,
         IProgress<DownloadItem>? progress,
         CancellationToken cancellationToken)
     {
@@ -139,9 +161,9 @@ public sealed class Downloader : IDisposable
         }
 
         using var request =
-            new HttpRequestMessage(HttpMethod.Get, item.Url);
+            new HttpRequestMessage(HttpMethod.Get, downloadUrl);
 
-        AddAcceptHeaders(request, item.Url);
+        AddAcceptHeaders(request, downloadUrl);
 
         if (existingLength > 0)
         {
@@ -261,6 +283,34 @@ public sealed class Downloader : IDisposable
         item.EstimatedTimeRemaining = TimeSpan.Zero;
         item.Status = "Completed";
         progress?.Report(item);
+    }
+
+    private static string CorrectUrlEncoding(string url)
+    {
+        var decodedUrl = WebUtility.HtmlDecode(url);
+
+        if (!Uri.TryCreate(decodedUrl, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp &&
+             uri.Scheme != Uri.UriSchemeHttps))
+        {
+            return url;
+        }
+
+        var encodedPath = string.Join(
+            "/",
+            uri.AbsolutePath
+                .Split('/')
+                .Select(segment => Uri.EscapeDataString(
+                    Uri.UnescapeDataString(segment)
+                ))
+        );
+
+        var builder = new UriBuilder(uri)
+        {
+            Path = encodedPath
+        };
+
+        return builder.Uri.AbsoluteUri;
     }
 
     private static void AddAcceptHeaders(
