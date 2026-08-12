@@ -1,6 +1,8 @@
 .source/
 bin/
 obj/
+publish/
+Release/
 Samples/
 .vs/
 .vscode/
