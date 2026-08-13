@@ -28,6 +28,8 @@ internal sealed class AppSettings
     public int? WindowWidth { get; set; }
     public int? WindowHeight { get; set; }
     public bool WindowMaximized { get; set; }
+    public bool ClearCompletedWhenAddingUrls { get; set; }
+    public bool RememberDestinationPerUrlAddition { get; set; }
 
     public static AppSettings Load()
     {

@@ -6,7 +6,9 @@ XiPHiAS MediaFetch is een lichte Windows-app voor het gelijktijdig downloaden va
 
 - Lees URL's uit een tekstbestand (`.txt`), één URL per regel.
 - Plak een gekopieerde lijst met URL's met `Ctrl+V` rechtstreeks in de wachtrij.
-- Negeer lege regels, commentaarregels die met `#` beginnen en dubbele URL's.
+- Onthoud optioneel per toevoegactie een eigen doelmap, zodat één wachtrij naar meerdere mappen kan downloaden.
+- Verwijder optioneel voltooide downloads zodra nieuwe URL's worden toegevoegd.
+- Negeer lege regels, ongeldige regels en `#`-commentaarregels die geen volledig doelpad bevatten.
 - Download 1 tot 20 bestanden tegelijk (standaard: 4).
 - Hervat gedeeltelijke downloads als de server HTTP-rangeverzoeken ondersteunt.
 - Volg redirects en pak gzip-, deflate- en Brotli-responses uit.
@@ -25,6 +27,7 @@ XiPHiAS MediaFetch is een lichte Windows-app voor het gelijktijdig downloaden va
 - Onthoud de laatst gebruikte bron- en doelmap.
 - Onthoud de vensterpositie, venstergrootte en maximalisatiestatus.
 - Controleer een ingevoerde doelmap direct en bied aan een ontbrekende map aan te maken.
+- Open via **Help > Handleiding** uitleg over de workflow, meerdere doelmappen, instellingen en statussen.
 
 ## Vereisten
 
@@ -56,13 +59,43 @@ https://example.com/media/foto-02.png
 https://example.com/video/clip.mp4
 ```
 
-Na het kiezen van een bestand verschijnen de URL's direct in de wachtrij. Je kunt dezelfde indeling ook rechtstreeks in de wachtrij plakken met `Ctrl+V` of via **URL's plakken** in het rechtermuisknopmenu. Alleen volledige `http://`- en `https://`-URL's worden verwerkt; ongeldige regels worden genegeerd. URL's uit bestanden en het klembord worden samengevoegd en dubbele URL's verschijnen maar één keer.
+Na het kiezen van een bestand verschijnen de URL's direct in de wachtrij. Je kunt dezelfde indeling ook rechtstreeks in de wachtrij plakken met `Ctrl+V` of via **URL's plakken** in het rechtermuisknopmenu. Alleen volledige `http://`- en `https://`-URL's worden verwerkt; ongeldige regels worden genegeerd. URL's uit bestanden en het klembord worden samengevoegd.
+
+Via **Instellingen** kan de doelmap per toevoegactie worden onthouden. Een URL-bestand gebruikt dan de doelmap die eronder in het hoofdscherm staat. Bij het plakken verschijnt een mapkeuze met de doelmap uit het hoofdscherm als standaard. De kolom **Doelmap** toont vervolgens waar ieder wachtrij-item wordt opgeslagen. Dezelfde URL kan zo ook voor verschillende doelmappen worden toegevoegd. In de instellingen kan bovendien worden gekozen om voltooide regels automatisch te verwijderen wanneer nieuwe URL's worden toegevoegd.
+
+Wanneer **Doelmap per toevoegactie onthouden** aanstaat, kan één URL-bestand meerdere doelmappen bevatten. Zet een volledig pad achter `#`; alle URL's eronder gebruiken die map totdat een volgende padregel wordt gevonden:
+
+```text
+# D:\Pictures\Camera
+https://example.com/camera-1.jpg
+https://example.com/camera-2.jpg
+# C:\Temp
+https://example.com/preview.jpg
+```
+
+URL's vóór de eerste padregel gebruiken de doelmap uit het hoofdscherm. Andere regels die met `#` beginnen blijven opmerkingen. Als de instelling uitstaat, worden alle `#`-regels als opmerkingen behandeld.
 
 De bestandsnaam wordt afgeleid uit het pad van de URL. Als de URL geen bestandsnaam bevat, maakt de app een unieke naam in de vorm `download_<id>`.
 
 ## Instellingen
 
-Via **Instellingen** kun je een browserpreset kiezen voor Chrome, Edge, Firefox, Safari, Opera, Opera GX, Brave of Internet Explorer 4. De bijbehorende User-Agent kan daarna handmatig worden aangepast.
+Via **Instellingen** zijn de volgende opties beschikbaar:
+
+- **Voltooide bestanden uit de lijst verwijderen bij het toevoegen van URL's** verwijdert regels met de status `Completed` wanneer een URL-bestand wordt toegevoegd of URL's worden geplakt. Alleen de wachtrijregels worden verwijderd; gedownloade bestanden blijven op schijf staan.
+- **Doelmap per toevoegactie onthouden** bewaart bij ieder wachtrij-item de gekozen doelmap. URL-bestanden ondersteunen dan `# <volledig pad>`-secties en bij plakken wordt om een map gevraagd. Als deze optie uitstaat, gebruikt de hele wachtrij bij het starten de doelmap uit het hoofdscherm.
+- **Browserpreset** kiest een User-Agent voor Chrome, Edge, Firefox, Safari, Opera, Opera GX, Brave of Internet Explorer 4.
+- **User-Agent** kan na het kiezen van een preset handmatig worden aangepast.
+
+## Ingebouwde handleiding
+
+Via **Help > Handleiding** opent een helpvenster met afzonderlijke tabbladen voor:
+
+- snel starten;
+- downloaden naar meerdere doelmappen;
+- uitleg van alle instellingen;
+- downloadstatussen en bestandsafhandeling.
+
+**Help > Over XiPHiAS MediaFetch** toont versie- en projectinformatie.
 
 De instellingen worden lokaal opgeslagen in:
 

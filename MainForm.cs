@@ -21,11 +21,11 @@ public class MainForm : Form
     private readonly Label lblSummary;
 
     private readonly ListView listDownloads;
-    private readonly List<string> queuedUrls = [];
-    private readonly HashSet<string> queuedUrlSet = new(
+    private readonly List<DownloadItem> queuedItems = [];
+    private readonly HashSet<string> queuedItemKeys = new(
         StringComparer.OrdinalIgnoreCase
     );
-    private readonly ConcurrentDictionary<string, byte> processedUrls = new(
+    private readonly ConcurrentDictionary<string, byte> processedItems = new(
         StringComparer.OrdinalIgnoreCase
     );
     private readonly Dictionary<string, ListViewItem> queueRows = new(
@@ -59,12 +59,20 @@ public class MainForm : Form
         menuStrip.Items.Add(settingsMenuItem);
 
         var helpMenuItem = new ToolStripMenuItem("Help");
+        var manualMenuItem = new ToolStripMenuItem("Handleiding");
+        manualMenuItem.Click += (_, _) =>
+        {
+            using var dialog = new HelpDialog();
+            dialog.ShowDialog(this);
+        };
         var aboutMenuItem = new ToolStripMenuItem("Over XiPHiAS MediaFetch");
         aboutMenuItem.Click += (_, _) =>
         {
             using var dialog = new AboutDialog();
             dialog.ShowDialog(this);
         };
+        helpMenuItem.DropDownItems.Add(manualMenuItem);
+        helpMenuItem.DropDownItems.Add(new ToolStripSeparator());
         helpMenuItem.DropDownItems.Add(aboutMenuItem);
         menuStrip.Items.Add(helpMenuItem);
         MainMenuStrip = menuStrip;
@@ -164,16 +172,6 @@ public class MainForm : Form
         };
 
         btnSelectFile.Click += BtnSelectFile_Click;
-        txtFile.TextChanged += (_, _) =>
-        {
-            if (File.Exists(txtFile.Text.Trim()))
-            {
-                AddUrlsToQueue(ReadUrlsFromInputFile(txtFile.Text.Trim()));
-            }
-
-            UpdateActionButtonState();
-        };
-
         var lblDestination = CreateFieldLabel("Doelmap:");
 
         txtDestination = new TextBox
@@ -181,6 +179,16 @@ public class MainForm : Form
             Dock = DockStyle.Fill,
             Margin = new Padding(3, 5, 8, 5),
             Text = GetInitialDestinationDirectory()
+        };
+
+        txtFile.TextChanged += (_, _) =>
+        {
+            if (File.Exists(txtFile.Text.Trim()))
+            {
+                AddUrlsFromInputFile(txtFile.Text.Trim());
+            }
+
+            UpdateActionButtonState();
         };
 
         btnSelectDestination = new Button
@@ -287,6 +295,7 @@ public class MainForm : Form
         listDownloads.Columns.Add("Snelheid", 110);
         listDownloads.Columns.Add("ETA", 80);
         listDownloads.Columns.Add("Status", 250);
+        listDownloads.Columns.Add("Doelmap", 220);
         listDownloads.Resize += (_, _) => ResizeDownloadColumns();
         listDownloads.KeyDown += ListDownloads_KeyDown;
 
@@ -328,12 +337,12 @@ public class MainForm : Form
 
     private void ResizeDownloadColumns()
     {
-        if (listDownloads.Columns.Count != 6 || listDownloads.ClientSize.Width <= 0)
+        if (listDownloads.Columns.Count != 7 || listDownloads.ClientSize.Width <= 0)
         {
             return;
         }
 
-        var fixedWidth = 90 + 100 + 110 + 80 + 250;
+        var fixedWidth = 90 + 100 + 110 + 80 + 250 + 220;
         listDownloads.Columns[0].Width = Math.Max(
             220,
             listDownloads.ClientSize.Width - fixedWidth - 8
@@ -356,7 +365,17 @@ public class MainForm : Form
 
         if (dialog.ShowDialog() == DialogResult.OK)
         {
+            var sameFile = string.Equals(
+                txtFile.Text.Trim(),
+                dialog.FileName,
+                StringComparison.OrdinalIgnoreCase);
             txtFile.Text = dialog.FileName;
+
+            if (sameFile)
+            {
+                AddUrlsFromInputFile(dialog.FileName);
+            }
+
             RememberSourceDirectory(dialog.FileName);
         }
     }
@@ -438,6 +457,51 @@ public class MainForm : Form
         }
     }
 
+    private bool EnsureDestinationDirectories(IEnumerable<DownloadItem> items)
+    {
+        var directories = settings.RememberDestinationPerUrlAddition
+            ? items.Select(item => Path.GetDirectoryName(item.DestinationPath))
+            : [txtDestination.Text.Trim()];
+
+        foreach (var directory in directories
+            .Where(directory => !string.IsNullOrWhiteSpace(directory))
+            .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (Directory.Exists(directory))
+            {
+                continue;
+            }
+
+            var result = MessageBox.Show(
+                $"De doelmap bestaat niet:\n\n{directory}\n\nWil je deze map aanmaken?",
+                "Doelmap aanmaken",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (result != DialogResult.Yes)
+            {
+                return false;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(directory!);
+            }
+            catch (Exception ex) when (ex is IOException or
+                UnauthorizedAccessException or ArgumentException or NotSupportedException)
+            {
+                MessageBox.Show(
+                    $"De doelmap kon niet worden aangemaakt:\n\n{ex.Message}",
+                    "XiPHiAS MediaFetch",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private async void BtnStart_Click(
         object? sender,
         EventArgs e)
@@ -452,11 +516,11 @@ public class MainForm : Form
             return;
         }
 
-        var pendingUrls = queuedUrls
-            .Where(url => !processedUrls.ContainsKey(url))
+        var items = queuedItems
+            .Where(item => !processedItems.ContainsKey(item.QueueKey))
             .ToList();
 
-        if (pendingUrls.Count == 0)
+        if (items.Count == 0)
         {
             MessageBox.Show(
                 "Kies een URL-bestand of plak URL's in de wachtrij met Ctrl+V.",
@@ -468,7 +532,7 @@ public class MainForm : Form
             return;
         }
 
-        if (!EnsureDestinationDirectory())
+        if (!EnsureDestinationDirectories(items))
         {
             return;
         }
@@ -495,9 +559,18 @@ public class MainForm : Form
 
         using var downloader = new Downloader(settings.UserAgent, referer);
 
-        var items = pendingUrls
-            .Select(CreateDownloadItem)
-            .ToList();
+        if (!settings.RememberDestinationPerUrlAddition)
+        {
+            foreach (var item in items)
+            {
+                item.DestinationPath = Path.Combine(
+                    txtDestination.Text.Trim(),
+                    item.FileName);
+
+                queueRows[item.QueueKey].SubItems[6].Text =
+                    txtDestination.Text.Trim();
+            }
+        }
 
         var existingItems = items
             .Where(item => File.Exists(item.DestinationPath))
@@ -552,7 +625,7 @@ public class MainForm : Form
 
         foreach (var item in items)
         {
-            var row = queueRows[item.Url];
+            var row = queueRows[item.QueueKey];
             row.SubItems[1].Text = "0%";
             row.SubItems[2].Text =
                 item.TotalBytes.HasValue
@@ -583,7 +656,7 @@ public class MainForm : Form
         );
 
         var failed =
-            new ConcurrentBag<string>();
+            new ConcurrentBag<DownloadItem>();
 
         var skipped = existingFileAction == ExistingFileAction.Skip
             ? existingItems.Count
@@ -603,7 +676,7 @@ public class MainForm : Form
                         File.Exists(item.DestinationPath)
                     )
                     {
-                        processedUrls.TryAdd(item.Url, 0);
+                        processedItems.TryAdd(item.QueueKey, 0);
                         Interlocked.Increment(ref completed);
 
                         Invoke((Action)(() =>
@@ -629,7 +702,7 @@ public class MainForm : Form
                                 current =>
                                 {
                                     if (!queueRows.TryGetValue(
-                                            current.Url,
+                                            current.QueueKey,
                                             out var row))
                                     {
                                         return;
@@ -665,7 +738,7 @@ public class MainForm : Form
                             CancellationToken.None
                         );
 
-                        processedUrls.TryAdd(item.Url, 0);
+                        processedItems.TryAdd(item.QueueKey, 0);
                         Interlocked.Increment(ref downloaded);
                     }
                     catch (OperationCanceledException)
@@ -673,7 +746,7 @@ public class MainForm : Form
                     }
                     catch
                     {
-                        failed.Add(item.Url);
+                        failed.Add(item);
                     }
                     finally
                     {
@@ -709,15 +782,14 @@ public class MainForm : Form
 
         if (!failed.IsEmpty)
         {
-            var failedFile = Path.Combine(
-                txtDestination.Text,
-                "failed.txt"
-            );
-
-            await File.WriteAllLinesAsync(
-                failedFile,
-                failed
-            );
+            foreach (var group in failed
+                .GroupBy(item => Path.GetDirectoryName(item.DestinationPath)!,
+                    StringComparer.OrdinalIgnoreCase))
+            {
+                await File.WriteAllLinesAsync(
+                    Path.Combine(group.Key, "failed.txt"),
+                    group.Select(item => item.Url));
+            }
         }
 
         if (
@@ -753,14 +825,54 @@ public class MainForm : Form
         }
     }
 
-    private static IEnumerable<string> ReadUrlsFromInputFile(string path)
+    private void AddUrlsFromInputFile(string path)
     {
         /*
          * TODO: HTML-extractie later opnieuw inschakelen na robuustere parsing
          * en tests. De eerdere aanpak zocht met AbsoluteUrlRegex in de volledige
          * HTML en decodeerde matches met WebUtility.HtmlDecode.
          */
-        return ReadUrlsFromText(File.ReadAllText(path));
+        AddUrlsToQueue(ReadUrlEntriesFromInputFile(
+            File.ReadAllText(path),
+            txtDestination.Text.Trim()));
+    }
+
+    private IEnumerable<(string Url, string DestinationDirectory)>
+        ReadUrlEntriesFromInputFile(string text, string defaultDestination)
+    {
+        var destination = defaultDestination;
+
+        foreach (var rawLine in text.Split(
+            ["\r\n", "\n", "\r"],
+            StringSplitOptions.None))
+        {
+            var line = rawLine.Trim();
+
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            if (line.StartsWith('#'))
+            {
+                var possiblePath = line[1..].Trim();
+
+                if (settings.RememberDestinationPerUrlAddition &&
+                    Path.IsPathFullyQualified(possiblePath))
+                {
+                    destination = possiblePath;
+                }
+
+                continue;
+            }
+
+            if (Uri.TryCreate(line, UriKind.Absolute, out var uri) &&
+                (uri.Scheme == Uri.UriSchemeHttp ||
+                 uri.Scheme == Uri.UriSchemeHttps))
+            {
+                yield return (line, destination);
+            }
+        }
     }
 
     private static IEnumerable<string> ReadUrlsFromText(string text)
@@ -792,49 +904,89 @@ public class MainForm : Form
             return;
         }
 
-        AddUrlsToQueue(ReadUrlsFromText(Clipboard.GetText()));
+        var destination = txtDestination.Text.Trim();
+
+        if (settings.RememberDestinationPerUrlAddition)
+        {
+            using var dialog = new FolderBrowserDialog
+            {
+                Description = "Kies de doelmap voor de geplakte URL's",
+                InitialDirectory = Directory.Exists(destination)
+                    ? destination
+                    : string.Empty
+            };
+
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            destination = dialog.SelectedPath;
+        }
+
+        AddUrlsToQueue(ReadUrlsFromText(Clipboard.GetText()), destination);
         listDownloads.Focus();
     }
 
-    private void AddUrlsToQueue(IEnumerable<string> urls)
+    private void AddUrlsToQueue(IEnumerable<string> urls, string destinationDirectory)
+    {
+        AddUrlsToQueue(urls.Select(url => (url, destinationDirectory)));
+    }
+
+    private void AddUrlsToQueue(
+        IEnumerable<(string Url, string DestinationDirectory)> entries)
     {
         if (isDownloading)
         {
             return;
         }
 
-        var added = 0;
-
-        foreach (var url in urls)
+        if (settings.ClearCompletedWhenAddingUrls)
         {
-            if (!queuedUrlSet.Add(url))
+            RemoveCompletedItems();
+        }
+
+        var added = 0;
+        foreach (var entry in entries)
+        {
+            var url = entry.Url;
+            var destinationDirectory = entry.DestinationDirectory;
+            var rememberedDestination = settings.RememberDestinationPerUrlAddition
+                ? destinationDirectory
+                : string.Empty;
+            var key = $"{url}\n{rememberedDestination}";
+
+            if (!queuedItemKeys.Add(key))
             {
                 continue;
             }
 
-            queuedUrls.Add(url);
-            var item = CreateDownloadItem(url);
+            var item = CreateDownloadItem(url, key, destinationDirectory);
+            queuedItems.Add(item);
             var row = new ListViewItem(item.Url);
             row.SubItems.Add("0%");
             row.SubItems.Add("—");
             row.SubItems.Add("—");
             row.SubItems.Add("—");
             row.SubItems.Add("Waiting");
+            row.SubItems.Add(destinationDirectory);
             row.Tag = item;
             listDownloads.Items.Add(row);
-            queueRows.Add(url, row);
+            queueRows.Add(key, row);
             added++;
         }
 
         lblSummary.Text = added > 0
-            ? $"{queuedUrls.Count} URL's in de wachtrij"
+            ? $"{queuedItems.Count} URL's in de wachtrij"
             : "Geen nieuwe geldige URL's gevonden";
 
         UpdateActionButtonState();
     }
 
     private DownloadItem CreateDownloadItem(
-        string url)
+        string url,
+        string queueKey,
+        string destinationDirectory)
     {
         var uri = new Uri(url);
 
@@ -864,13 +1016,35 @@ public class MainForm : Form
 
         return new DownloadItem
         {
+            QueueKey = queueKey,
             Url = url,
             FileName = fileName,
             DestinationPath = Path.Combine(
-                txtDestination.Text,
+                destinationDirectory,
                 fileName
             )
         };
+    }
+
+    private void RemoveCompletedItems()
+    {
+        var completedItems = queuedItems
+            .Where(item => item.Status == "Completed" ||
+                (queueRows.TryGetValue(item.QueueKey, out var row) &&
+                 row.SubItems[5].Text == "Completed"))
+            .ToList();
+
+        foreach (var item in completedItems)
+        {
+            if (queueRows.Remove(item.QueueKey, out var row))
+            {
+                listDownloads.Items.Remove(row);
+            }
+
+            queuedItems.Remove(item);
+            queuedItemKeys.Remove(item.QueueKey);
+            processedItems.TryRemove(item.QueueKey, out _);
+        }
     }
 
     private static void RenameExistingItems(
@@ -995,8 +1169,17 @@ public class MainForm : Form
             ) is string[] files &&
             files.Length > 0)
         {
+            var sameFile = string.Equals(
+                txtFile.Text.Trim(),
+                files[0],
+                StringComparison.OrdinalIgnoreCase);
             txtFile.Text =
                 files[0];
+
+            if (sameFile)
+            {
+                AddUrlsFromInputFile(files[0]);
+            }
 
             RememberSourceDirectory(files[0]);
         }
@@ -1074,7 +1257,10 @@ public class MainForm : Form
 
     private void SettingsMenuItem_Click(object? sender, EventArgs e)
     {
-        using var dialog = new SettingsDialog(settings.UserAgent);
+        using var dialog = new SettingsDialog(
+            settings.UserAgent,
+            settings.ClearCompletedWhenAddingUrls,
+            settings.RememberDestinationPerUrlAddition);
 
         if (dialog.ShowDialog(this) != DialogResult.OK)
         {
@@ -1109,6 +1295,10 @@ public class MainForm : Form
         }
 
         settings.UserAgent = dialog.UserAgent;
+        settings.ClearCompletedWhenAddingUrls =
+            dialog.ClearCompletedWhenAddingUrls;
+        settings.RememberDestinationPerUrlAddition =
+            dialog.RememberDestinationPerUrlAddition;
         settings.Save();
     }
 
@@ -1145,7 +1335,7 @@ public class MainForm : Form
         }
 
         btnStart.Enabled =
-            queuedUrls.Any(url => !processedUrls.ContainsKey(url)) &&
+            queuedItems.Any(item => !processedItems.ContainsKey(item.QueueKey)) &&
             !string.IsNullOrWhiteSpace(txtDestination.Text);
 
         UpdateActionButtonAppearance();

@@ -55,13 +55,20 @@ internal sealed class SettingsDialog : Form
     ];
 
     private readonly TextBox userAgentTextBox;
+    private readonly CheckBox clearCompletedCheckBox;
+    private readonly CheckBox rememberDestinationCheckBox;
 
     public string UserAgent => userAgentTextBox.Text.Trim();
+    public bool ClearCompletedWhenAddingUrls => clearCompletedCheckBox.Checked;
+    public bool RememberDestinationPerUrlAddition => rememberDestinationCheckBox.Checked;
 
-    public SettingsDialog(string currentUserAgent)
+    public SettingsDialog(
+        string currentUserAgent,
+        bool clearCompletedWhenAddingUrls,
+        bool rememberDestinationPerUrlAddition)
     {
         Text = "Instellingen";
-        ClientSize = new Size(720, 245);
+        ClientSize = new Size(720, 335);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -127,11 +134,38 @@ internal sealed class SettingsDialog : Form
             Width = 680
         };
 
+        clearCompletedCheckBox = new CheckBox
+        {
+            Text = "Voltooide bestanden uit de lijst verwijderen bij het toevoegen van URL's",
+            Left = 20,
+            Top = 190,
+            Width = 680,
+            Checked = clearCompletedWhenAddingUrls
+        };
+
+        rememberDestinationCheckBox = new CheckBox
+        {
+            Text = "Doelmap per toevoegactie onthouden",
+            Left = 20,
+            Top = 222,
+            Width = 680,
+            Checked = rememberDestinationPerUrlAddition
+        };
+
+        var destinationHint = new Label
+        {
+            Text = "Bij plakken wordt om een doelmap gevraagd; URL-bestanden gebruiken de doelmap uit het hoofdscherm.",
+            Left = 40,
+            Top = 248,
+            Width = 660,
+            ForeColor = SystemColors.GrayText
+        };
+
         var saveButton = new Button
         {
             Text = "Opslaan",
             Left = 480,
-            Top = 190,
+            Top = 280,
             Width = 105,
             Height = 35,
             DialogResult = DialogResult.OK
@@ -141,7 +175,7 @@ internal sealed class SettingsDialog : Form
         {
             Text = "Annuleren",
             Left = 595,
-            Top = 190,
+            Top = 280,
             Width = 105,
             Height = 35,
             DialogResult = DialogResult.Cancel
@@ -155,6 +189,9 @@ internal sealed class SettingsDialog : Form
             userAgentLabel,
             userAgentTextBox,
             hint,
+            clearCompletedCheckBox,
+            rememberDestinationCheckBox,
+            destinationHint,
             saveButton,
             cancelButton
         ]);

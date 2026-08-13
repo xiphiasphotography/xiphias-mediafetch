@@ -2,6 +2,8 @@ namespace XiPHiAS.MediaFetch;
 
 public class DownloadItem
 {
+    public required string QueueKey { get; init; }
+
     public required string Url { get; init; }
 
     public required string FileName { get; set; }
