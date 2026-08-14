@@ -15,7 +15,11 @@ XiPHiAS MediaFetch is een lichte Windows-app voor het gelijktijdig downloaden va
 - Probeer een mislukte download maximaal drie keer, met oplopende wachttijd.
 - Corrigeer na een mislukte eerste poging HTML-entiteiten en onjuiste URL-padencoding automatisch (bijvoorbeeld `&amp;` naar `%26`).
 - Toon per bestand de voortgang, grootte, snelheid, resterende tijd en status.
+- Bekijk compacte bestands- en doelmapnamen in de wachtrij en beweeg erover voor de volledige URL of het volledige doelpad.
+- Open met dubbelklik of het rechtermuisknopmenu een URL in de standaardbrowser of een doelmap in Windows Verkenner.
+- Verwijder een afzonderlijke wachtrijregel via **✕ Verwijderen** in het rechtermuisknopmenu.
 - Schakel **Start** uit wanneer de wachtrij leeg is of alle items zijn voltooid of overgeslagen.
+- Verwijder via **Clear** bevestigde categorieën uit de wachtrij zonder bestanden op schijf te verwijderen.
 - Stop een actieve downloadbatch vanuit de interface.
 - Controleer bestaande bestanden aan de hand van de externe `Content-Length`, indien beschikbaar.
 - Overschrijf, sla over of hernoem bestaande doelbestanden automatisch.
@@ -61,7 +65,7 @@ https://example.com/video/clip.mp4
 
 Na het kiezen van een bestand verschijnen de URL's direct in de wachtrij. Je kunt dezelfde indeling ook rechtstreeks in de wachtrij plakken met `Ctrl+V` of via **URL's plakken** in het rechtermuisknopmenu. Alleen volledige `http://`- en `https://`-URL's worden verwerkt; ongeldige regels worden genegeerd. URL's uit bestanden en het klembord worden samengevoegd.
 
-Via **Instellingen** kan de doelmap per toevoegactie worden onthouden. Een URL-bestand gebruikt dan de doelmap die eronder in het hoofdscherm staat. Bij het plakken verschijnt een mapkeuze met de doelmap uit het hoofdscherm als standaard. De kolom **Doelmap** toont vervolgens waar ieder wachtrij-item wordt opgeslagen. Dezelfde URL kan zo ook voor verschillende doelmappen worden toegevoegd. In de instellingen kan bovendien worden gekozen om voltooide regels automatisch te verwijderen wanneer nieuwe URL's worden toegevoegd.
+Via **Instellingen** kan de doelmap per toevoegactie worden onthouden. Een URL-bestand gebruikt dan de doelmap die eronder in het hoofdscherm staat. Geplakte tekst met volledige paden achter `#` wordt op dezelfde manier verwerkt en opent geen mapkeuze. Bevat de geplakte tekst geen padregels, dan verschijnt een mapkeuze met de doelmap uit het hoofdscherm als standaard. De kolom **Doelmap** toont vervolgens waar ieder wachtrij-item wordt opgeslagen. Dezelfde URL kan zo ook voor verschillende doelmappen worden toegevoegd. In de instellingen kan bovendien worden gekozen om voltooide regels automatisch te verwijderen wanneer nieuwe URL's worden toegevoegd.
 
 Wanneer **Doelmap per toevoegactie onthouden** aanstaat, kan één URL-bestand meerdere doelmappen bevatten. Zet een volledig pad achter `#`; alle URL's eronder gebruiken die map totdat een volgende padregel wordt gevonden:
 
@@ -82,9 +86,10 @@ De bestandsnaam wordt afgeleid uit het pad van de URL. Als de URL geen bestandsn
 Via **Instellingen** zijn de volgende opties beschikbaar:
 
 - **Voltooide bestanden uit de lijst verwijderen bij het toevoegen van URL's** verwijdert regels met de status `Completed` wanneer een URL-bestand wordt toegevoegd of URL's worden geplakt. Alleen de wachtrijregels worden verwijderd; gedownloade bestanden blijven op schijf staan.
-- **Doelmap per toevoegactie onthouden** bewaart bij ieder wachtrij-item de gekozen doelmap. URL-bestanden ondersteunen dan `# <volledig pad>`-secties en bij plakken wordt om een map gevraagd. Als deze optie uitstaat, gebruikt de hele wachtrij bij het starten de doelmap uit het hoofdscherm.
+- **Doelmap per toevoegactie onthouden** bewaart bij ieder wachtrij-item de gekozen doelmap. URL-bestanden en geplakte tekst ondersteunen dan `# <volledig pad>`-secties. Bij plakken wordt alleen om een map gevraagd wanneer zulke padregels ontbreken. Als deze optie uitstaat, gebruikt de hele wachtrij bij het starten de doelmap uit het hoofdscherm.
 - **Browserpreset** kiest een User-Agent voor Chrome, Edge, Firefox, Safari, Opera, Opera GX, Brave of Internet Explorer 4.
 - **User-Agent** kan na het kiezen van een preset handmatig worden aangepast.
+- **Clear-functionaliteit** bepaalt of het bevestigingsvenster standaard Completed, Failed of Alles selecteert. Bij Alles worden de andere opties uitgeschakeld; vóór het verwijderen kan de selectie nog eenmalig worden aangepast.
 
 ## Ingebouwde handleiding
 

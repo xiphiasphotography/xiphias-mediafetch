@@ -9,10 +9,10 @@
     <RootNamespace>XiPHiAS.MediaFetch</RootNamespace>
     <AssemblyName>XiPHiAS.MediaFetch</AssemblyName>
 
-    <Version>0.2.0</Version>
-    <AssemblyVersion>0.2.0.0</AssemblyVersion>
-    <FileVersion>0.2.0.0</FileVersion>
-    <InformationalVersion>0.2.0</InformationalVersion>
+    <Version>0.2.2</Version>
+    <AssemblyVersion>0.2.2.0</AssemblyVersion>
+    <FileVersion>0.2.2.0</FileVersion>
+    <InformationalVersion>0.2.2</InformationalVersion>
     <Product>XiPHiAS MediaFetch</Product>
     <Title>XiPHiAS MediaFetch</Title>
     <AssemblyTitle>XiPHiAS MediaFetch</AssemblyTitle>

@@ -28,6 +28,8 @@ internal sealed class HelpDialog : Form
 
             Bij bestaande bestanden kun je kiezen voor overschrijven, overslaan of hernoemen. Met Stop worden geen nieuwe downloads gestart; actieve downloads mogen eerst netjes eindigen.
 
+            Met Clear verwijder je regels uit de downloadlijst. Voor het verwijderen verschijnt een venster waarin je Completed, Failed of Alles kunt kiezen en het aantal te verwijderen regels ziet. Bestanden op schijf worden niet verwijderd.
+
             Alleen volledige http- en https-URL's worden toegevoegd. Lege regels en ongeldige regels worden overgeslagen.
             """));
 
@@ -50,7 +52,7 @@ internal sealed class HelpDialog : Form
             URL's vóór de eerste padregel gebruiken de doelmap uit het hoofdscherm. Een # regel die geen volledig pad bevat, blijft een gewone opmerking.
 
             Plakken
-            Bij Ctrl+V verschijnt een mapkeuze. De map uit het hoofdscherm is voorgeselecteerd. Alle URL's uit die plakactie krijgen de gekozen map.
+            Plak je tekst met volledige paden achter #, dan worden die paden op dezelfde manier verwerkt als in een URL-bestand en verschijnt geen mapkeuze. Zonder zulke padregels verschijnt bij Ctrl+V een mapkeuze. De map uit het hoofdscherm is voorgeselecteerd en geldt dan voor alle URL's uit die plakactie.
 
             Dezelfde URL mag meerdere keren in de wachtrij staan wanneer de doelmap verschilt.
             """));
@@ -62,7 +64,10 @@ internal sealed class HelpDialog : Form
             Als deze optie aanstaat, worden regels met de status Completed uit de wachtrij verwijderd zodra je een nieuwe URL-lijst toevoegt of URL's plakt. Bestanden op schijf worden niet verwijderd.
 
             Doelmap per toevoegactie onthouden
-            Als deze optie aanstaat, bewaart ieder wachtrij-item zijn eigen doelmap. Dit maakt één downloadbatch naar meerdere mappen mogelijk. Als de optie uitstaat, gebruikt de hele wachtrij bij Start de doelmap uit het hoofdscherm en zijn # padregels gewone opmerkingen.
+            Als deze optie aanstaat, bewaart ieder wachtrij-item zijn eigen doelmap. Dit maakt één downloadbatch naar meerdere mappen mogelijk. Padregels in geplakte tekst worden net als padregels in een URL-bestand verwerkt. Als de optie uitstaat, gebruikt de hele wachtrij bij Start de doelmap uit het hoofdscherm en zijn # padregels gewone opmerkingen.
+
+            Clear-functionaliteit
+            Kies welke opties standaard zijn aangevinkt wanneer je op Clear drukt: Completed, Failed of Alles. Bij Alles worden de andere twee keuzes uitgeschakeld. In het bevestigingsvenster kun je de selectie voor die ene opruimactie nog aanpassen.
 
             Browserpreset en User-Agent
             Een preset vult een gangbare browser-User-Agent in. Je kunt deze daarna handmatig aanpassen. Dit kan helpen bij servers die verzoeken zonder herkenbare browsergegevens weigeren.
@@ -80,6 +85,10 @@ internal sealed class HelpDialog : Form
             Skipped       Is overgeslagen vanwege een bestaand bestand.
 
             De bestandsnaam wordt afgeleid uit de URL. Als de URL geen bruikbare naam bevat, wordt automatisch een unieke naam gemaakt.
+
+            In de wachtrij worden de bestandsnaam en laatste doelmap compact weergegeven. Beweeg de muis over de bestandsnaam voor de volledige URL of over de doelmap voor het volledige doelpad.
+
+            Dubbelklik op een bestandsnaam om de URL in de standaardbrowser te openen. Dubbelklik op een doelmap om deze in Windows Verkenner te openen. Dezelfde acties staan in het rechtermuisknopmenu. Via ✕ Verwijderen kun je een afzonderlijke regel uit de lijst halen.
 
             Gedeeltelijke bestanden worden waar mogelijk hervat. Bij mislukte downloads probeert MediaFetch het verzoek maximaal drie keer opnieuw. Mislukte URL's worden per doelmap in failed.txt geschreven.
 

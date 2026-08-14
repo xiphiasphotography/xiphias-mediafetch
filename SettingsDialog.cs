@@ -57,18 +57,27 @@ internal sealed class SettingsDialog : Form
     private readonly TextBox userAgentTextBox;
     private readonly CheckBox clearCompletedCheckBox;
     private readonly CheckBox rememberDestinationCheckBox;
+    private readonly CheckBox clearCompletedByDefaultCheckBox;
+    private readonly CheckBox clearFailedByDefaultCheckBox;
+    private readonly CheckBox clearAllByDefaultCheckBox;
 
     public string UserAgent => userAgentTextBox.Text.Trim();
     public bool ClearCompletedWhenAddingUrls => clearCompletedCheckBox.Checked;
     public bool RememberDestinationPerUrlAddition => rememberDestinationCheckBox.Checked;
+    public bool ClearCompletedByDefault => clearCompletedByDefaultCheckBox.Checked;
+    public bool ClearFailedByDefault => clearFailedByDefaultCheckBox.Checked;
+    public bool ClearAllByDefault => clearAllByDefaultCheckBox.Checked;
 
     public SettingsDialog(
         string currentUserAgent,
         bool clearCompletedWhenAddingUrls,
-        bool rememberDestinationPerUrlAddition)
+        bool rememberDestinationPerUrlAddition,
+        bool clearCompletedByDefault,
+        bool clearFailedByDefault,
+        bool clearAllByDefault)
     {
         Text = "Instellingen";
-        ClientSize = new Size(720, 335);
+        ClientSize = new Size(720, 465);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -161,11 +170,74 @@ internal sealed class SettingsDialog : Form
             ForeColor = SystemColors.GrayText
         };
 
+        var clearGroup = new GroupBox
+        {
+            Text = "Clear-functionaliteit — standaardselectie",
+            Left = 20,
+            Top = 280,
+            Width = 680,
+            Height = 120
+        };
+
+        clearCompletedByDefaultCheckBox = new CheckBox
+        {
+            Text = "Completed",
+            Left = 16,
+            Top = 28,
+            Width = 120,
+            Checked = clearCompletedByDefault
+        };
+
+        clearFailedByDefaultCheckBox = new CheckBox
+        {
+            Text = "Failed",
+            Left = 150,
+            Top = 28,
+            Width = 100,
+            Checked = clearFailedByDefault
+        };
+
+        clearAllByDefaultCheckBox = new CheckBox
+        {
+            Text = "Alles",
+            Left = 270,
+            Top = 28,
+            Width = 100,
+            Checked = clearAllByDefault
+        };
+
+        var clearHint = new Label
+        {
+            Text = "Deze selectie wordt vooraf ingevuld in het bevestigingsvenster van Clear.",
+            Left = 16,
+            Top = 64,
+            Width = 640,
+            ForeColor = SystemColors.GrayText
+        };
+
+        void UpdateClearOptions()
+        {
+            clearCompletedByDefaultCheckBox.Enabled =
+                !clearAllByDefaultCheckBox.Checked;
+            clearFailedByDefaultCheckBox.Enabled =
+                !clearAllByDefaultCheckBox.Checked;
+        }
+
+        clearAllByDefaultCheckBox.CheckedChanged += (_, _) =>
+            UpdateClearOptions();
+        UpdateClearOptions();
+        clearGroup.Controls.AddRange([
+            clearCompletedByDefaultCheckBox,
+            clearFailedByDefaultCheckBox,
+            clearAllByDefaultCheckBox,
+            clearHint
+        ]);
+
         var saveButton = new Button
         {
             Text = "Opslaan",
             Left = 480,
-            Top = 280,
+            Top = 415,
             Width = 105,
             Height = 35,
             DialogResult = DialogResult.OK
@@ -175,7 +247,7 @@ internal sealed class SettingsDialog : Form
         {
             Text = "Annuleren",
             Left = 595,
-            Top = 280,
+            Top = 415,
             Width = 105,
             Height = 35,
             DialogResult = DialogResult.Cancel
@@ -192,6 +264,7 @@ internal sealed class SettingsDialog : Form
             clearCompletedCheckBox,
             rememberDestinationCheckBox,
             destinationHint,
+            clearGroup,
             saveButton,
             cancelButton
         ]);

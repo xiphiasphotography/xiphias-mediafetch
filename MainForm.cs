@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace XiPHiAS.MediaFetch;
 
@@ -14,6 +15,7 @@ public class MainForm : Form
     private readonly Button btnSelectFile;
     private readonly Button btnSelectDestination;
     private readonly Button btnStart;
+    private readonly Button btnClear;
 
     private readonly NumericUpDown numConcurrent;
 
@@ -21,6 +23,8 @@ public class MainForm : Form
     private readonly Label lblSummary;
 
     private readonly ListView listDownloads;
+    private readonly ToolTip queueToolTip;
+    private ListViewItem.ListViewSubItem? queueToolTipSubItem;
     private readonly List<DownloadItem> queuedItems = [];
     private readonly HashSet<string> queuedItemKeys = new(
         StringComparer.OrdinalIgnoreCase
@@ -233,13 +237,14 @@ public class MainForm : Form
         {
             Dock = DockStyle.Top,
             AutoSize = true,
-            ColumnCount = 4,
+            ColumnCount = 5,
             RowCount = 1,
             Margin = new Padding(0, 0, 0, 10)
         };
         actionLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         actionLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         actionLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        actionLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         actionLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
         var lblConcurrent = CreateFieldLabel("Tegelijk:");
@@ -268,16 +273,41 @@ public class MainForm : Form
             Margin = new Padding(0)
         };
 
+        btnClear = new Button
+        {
+            Text = "Clear",
+            Width = 100,
+            Height = 32,
+            Enabled = false,
+            Margin = new Padding(0, 0, 8, 0)
+        };
+
         btnStart.Click += BtnStart_Click;
+        btnClear.Click += BtnClear_Click;
         actionLayout.Controls.Add(lblConcurrent, 0, 0);
         actionLayout.Controls.Add(numConcurrent, 1, 0);
-        actionLayout.Controls.Add(btnStart, 3, 0);
+        actionLayout.Controls.Add(btnClear, 3, 0);
+        actionLayout.Controls.Add(btnStart, 4, 0);
 
         progressTotal = new ProgressBar
         {
             Dock = DockStyle.Fill,
             Margin = new Padding(0, 0, 0, 8)
         };
+
+        queueToolTip = new ToolTip
+        {
+            InitialDelay = 400,
+            ReshowDelay = 100,
+            AutoPopDelay = 30000,
+            ShowAlways = true
+        };
+        queueToolTip.SetToolTip(
+            btnStart,
+            "Start de wachtende downloads.");
+        queueToolTip.SetToolTip(
+            btnClear,
+            "Verwijder regels uit de downloadlijst volgens je standaardselectie.");
 
         listDownloads = new ListView
         {
@@ -289,7 +319,7 @@ public class MainForm : Form
             Margin = new Padding(0)
         };
 
-        listDownloads.Columns.Add("URL", 300);
+        listDownloads.Columns.Add("Bestand", 300);
         listDownloads.Columns.Add("Voortgang", 90);
         listDownloads.Columns.Add("Grootte", 100);
         listDownloads.Columns.Add("Snelheid", 110);
@@ -298,12 +328,72 @@ public class MainForm : Form
         listDownloads.Columns.Add("Doelmap", 220);
         listDownloads.Resize += (_, _) => ResizeDownloadColumns();
         listDownloads.KeyDown += ListDownloads_KeyDown;
+        listDownloads.MouseMove += ListDownloads_MouseMove;
+        listDownloads.MouseDoubleClick += ListDownloads_MouseDoubleClick;
+        listDownloads.MouseLeave += (_, _) => HideQueueToolTip();
+        FormClosed += (_, _) => queueToolTip.Dispose();
 
         var queueMenu = new ContextMenuStrip();
+        var openUrlMenuItem = new ToolStripMenuItem("Openen in browser");
+        var openFolderMenuItem = new ToolStripMenuItem("Openen in Windows Verkenner");
+        var removeMenuItem = new ToolStripMenuItem("✕ Verwijderen");
+        var rowActionsSeparator = new ToolStripSeparator();
         var pasteMenuItem = new ToolStripMenuItem("URL's plakken");
+        DownloadItem? contextItem = null;
+        var contextColumn = -1;
+
+        queueMenu.Opening += (_, _) =>
+        {
+            var location = listDownloads.PointToClient(Cursor.Position);
+            var hit = listDownloads.HitTest(location);
+            contextItem = hit.Item?.Tag as DownloadItem;
+            contextColumn = hit.Item is null || hit.SubItem is null
+                ? -1
+                : hit.Item.SubItems.IndexOf(hit.SubItem);
+
+            if (hit.Item is not null)
+            {
+                hit.Item.Selected = true;
+            }
+
+            openUrlMenuItem.Visible = contextItem is not null && contextColumn == 0;
+            openFolderMenuItem.Visible = contextItem is not null && contextColumn == 6;
+            removeMenuItem.Visible = contextItem is not null;
+            removeMenuItem.Enabled = !isDownloading;
+            rowActionsSeparator.Visible = contextItem is not null;
+        };
+        openUrlMenuItem.Click += (_, _) =>
+        {
+            if (contextItem is not null)
+            {
+                OpenQueueTarget(contextItem, 0);
+            }
+        };
+        openFolderMenuItem.Click += (_, _) =>
+        {
+            if (contextItem is not null)
+            {
+                OpenQueueTarget(contextItem, 6);
+            }
+        };
+        removeMenuItem.Click += (_, _) =>
+        {
+            if (contextItem is null || isDownloading)
+            {
+                return;
+            }
+
+            RemoveSingleQueueItem(contextItem);
+        };
         pasteMenuItem.ShortcutKeys = Keys.Control | Keys.V;
         pasteMenuItem.Click += (_, _) => PasteUrlsIntoQueue();
-        queueMenu.Items.Add(pasteMenuItem);
+        queueMenu.Items.AddRange([
+            openUrlMenuItem,
+            openFolderMenuItem,
+            removeMenuItem,
+            rowActionsSeparator,
+            pasteMenuItem
+        ]);
         listDownloads.ContextMenuStrip = queueMenu;
 
         lblSummary = new Label
@@ -568,7 +658,7 @@ public class MainForm : Form
                     item.FileName);
 
                 queueRows[item.QueueKey].SubItems[6].Text =
-                    txtDestination.Text.Trim();
+                    FormatDestinationForQueue(item.DestinationPath);
             }
         }
 
@@ -626,6 +716,9 @@ public class MainForm : Form
         foreach (var item in items)
         {
             var row = queueRows[item.QueueKey];
+            row.Text = FormatFileNameForQueue(item.FileName);
+            row.SubItems[6].Text =
+                FormatDestinationForQueue(item.DestinationPath);
             row.SubItems[1].Text = "0%";
             row.SubItems[2].Text =
                 item.TotalBytes.HasValue
@@ -904,10 +997,28 @@ public class MainForm : Form
             return;
         }
 
+        var clipboardText = Clipboard.GetText();
         var destination = txtDestination.Text.Trim();
 
         if (settings.RememberDestinationPerUrlAddition)
         {
+            var containsDestinationPaths = clipboardText.Split(
+                    ["\r\n", "\n", "\r"],
+                    StringSplitOptions.None)
+                .Select(line => line.Trim())
+                .Where(line => line.StartsWith('#'))
+                .Select(line => line[1..].Trim())
+                .Any(Path.IsPathFullyQualified);
+
+            if (containsDestinationPaths)
+            {
+                AddUrlsToQueue(ReadUrlEntriesFromInputFile(
+                    clipboardText,
+                    destination));
+                listDownloads.Focus();
+                return;
+            }
+
             using var dialog = new FolderBrowserDialog
             {
                 Description = "Kies de doelmap voor de geplakte URL's",
@@ -924,7 +1035,7 @@ public class MainForm : Form
             destination = dialog.SelectedPath;
         }
 
-        AddUrlsToQueue(ReadUrlsFromText(Clipboard.GetText()), destination);
+        AddUrlsToQueue(ReadUrlsFromText(clipboardText), destination);
         listDownloads.Focus();
     }
 
@@ -963,13 +1074,13 @@ public class MainForm : Form
 
             var item = CreateDownloadItem(url, key, destinationDirectory);
             queuedItems.Add(item);
-            var row = new ListViewItem(item.Url);
+            var row = new ListViewItem(FormatFileNameForQueue(item.FileName));
             row.SubItems.Add("0%");
             row.SubItems.Add("—");
             row.SubItems.Add("—");
             row.SubItems.Add("—");
             row.SubItems.Add("Waiting");
-            row.SubItems.Add(destinationDirectory);
+            row.SubItems.Add(FormatDestinationForQueue(item.DestinationPath));
             row.Tag = item;
             listDownloads.Items.Add(row);
             queueRows.Add(key, row);
@@ -1026,6 +1137,128 @@ public class MainForm : Form
         };
     }
 
+    private void ListDownloads_MouseMove(object? sender, MouseEventArgs e)
+    {
+        var hit = listDownloads.HitTest(e.Location);
+        var subItem = hit.SubItem;
+
+        if (subItem is null || ReferenceEquals(subItem, queueToolTipSubItem))
+        {
+            return;
+        }
+
+        HideQueueToolTip();
+
+        if (hit.Item?.Tag is not DownloadItem item)
+        {
+            return;
+        }
+
+        var columnIndex = hit.Item.SubItems.IndexOf(subItem);
+        var text = columnIndex switch
+        {
+            0 => item.Url,
+            6 => item.DestinationPath,
+            _ => null
+        };
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        queueToolTipSubItem = subItem;
+        queueToolTip.Show(
+            text,
+            listDownloads,
+            e.X + 16,
+            e.Y + 20,
+            queueToolTip.AutoPopDelay);
+    }
+
+    private void ListDownloads_MouseDoubleClick(object? sender, MouseEventArgs e)
+    {
+        var hit = listDownloads.HitTest(e.Location);
+
+        if (hit.Item?.Tag is not DownloadItem item || hit.SubItem is null)
+        {
+            return;
+        }
+
+        var columnIndex = hit.Item.SubItems.IndexOf(hit.SubItem);
+
+        if (columnIndex is 0 or 6)
+        {
+            OpenQueueTarget(item, columnIndex);
+        }
+    }
+
+    private void OpenQueueTarget(DownloadItem item, int columnIndex)
+    {
+        var target = columnIndex == 0
+            ? item.Url
+            : Path.GetDirectoryName(item.DestinationPath);
+
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            return;
+        }
+
+        if (columnIndex == 6 && !Directory.Exists(target))
+        {
+            MessageBox.Show(
+                $"De doelmap bestaat nog niet:\n\n{target}",
+                "Doelmap openen",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = target,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex) when (ex is
+            System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            MessageBox.Show(
+                $"Kan niet openen:\n\n{target}\n\n{ex.Message}",
+                "XiPHiAS MediaFetch",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+    }
+
+    private void HideQueueToolTip()
+    {
+        queueToolTip.Hide(listDownloads);
+        queueToolTipSubItem = null;
+    }
+
+    private static string FormatFileNameForQueue(string fileName) =>
+        $"…\\{fileName}";
+
+    private static string FormatDestinationForQueue(string destinationPath)
+    {
+        var directory = Path.GetDirectoryName(destinationPath);
+
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            return "…";
+        }
+
+        var trimmedDirectory = Path.TrimEndingDirectorySeparator(directory);
+        var folderName = Path.GetFileName(trimmedDirectory);
+
+        return string.IsNullOrWhiteSpace(folderName)
+            ? $"…\\{trimmedDirectory}"
+            : $"…\\{folderName}";
+    }
+
     private void RemoveCompletedItems()
     {
         var completedItems = queuedItems
@@ -1034,7 +1267,62 @@ public class MainForm : Form
                  row.SubItems[5].Text == "Completed"))
             .ToList();
 
-        foreach (var item in completedItems)
+        RemoveQueueItems(completedItems);
+    }
+
+    private void BtnClear_Click(object? sender, EventArgs e)
+    {
+        if (isDownloading || queuedItems.Count == 0)
+        {
+            return;
+        }
+
+        var completedCount = queuedItems.Count(IsCompletedItem);
+        var failedCount = queuedItems.Count(IsFailedItem);
+
+        using var dialog = new ClearQueueDialog(
+            completedCount,
+            failedCount,
+            queuedItems.Count,
+            settings.ClearCompletedByDefault,
+            settings.ClearFailedByDefault,
+            settings.ClearAllByDefault);
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        var itemsToRemove = queuedItems
+            .Where(item => dialog.RemoveAll ||
+                (dialog.RemoveCompleted && IsCompletedItem(item)) ||
+                (dialog.RemoveFailed && IsFailedItem(item)))
+            .ToList();
+
+        RemoveQueueItems(itemsToRemove);
+        progressTotal.Value = 0;
+        progressTotal.Maximum = Math.Max(1, queuedItems.Count);
+        lblSummary.Text = itemsToRemove.Count == 0
+            ? "Geen regels verwijderd"
+            : $"{itemsToRemove.Count} regel(s) uit de lijst verwijderd";
+        UpdateActionButtonState();
+    }
+
+    private bool IsCompletedItem(DownloadItem item) =>
+        item.Status == "Completed" ||
+        (queueRows.TryGetValue(item.QueueKey, out var row) &&
+         row.SubItems[5].Text == "Completed");
+
+    private bool IsFailedItem(DownloadItem item) =>
+        item.Status.StartsWith("Failed", StringComparison.OrdinalIgnoreCase) ||
+        (queueRows.TryGetValue(item.QueueKey, out var row) &&
+         row.SubItems[5].Text.StartsWith(
+             "Failed",
+             StringComparison.OrdinalIgnoreCase));
+
+    private void RemoveQueueItems(IEnumerable<DownloadItem> items)
+    {
+        foreach (var item in items.ToList())
         {
             if (queueRows.Remove(item.QueueKey, out var row))
             {
@@ -1045,6 +1333,13 @@ public class MainForm : Form
             queuedItemKeys.Remove(item.QueueKey);
             processedItems.TryRemove(item.QueueKey, out _);
         }
+    }
+
+    private void RemoveSingleQueueItem(DownloadItem item)
+    {
+        RemoveQueueItems([item]);
+        lblSummary.Text = "1 regel uit de lijst verwijderd";
+        UpdateActionButtonState();
     }
 
     private static void RenameExistingItems(
@@ -1260,7 +1555,10 @@ public class MainForm : Form
         using var dialog = new SettingsDialog(
             settings.UserAgent,
             settings.ClearCompletedWhenAddingUrls,
-            settings.RememberDestinationPerUrlAddition);
+            settings.RememberDestinationPerUrlAddition,
+            settings.ClearCompletedByDefault,
+            settings.ClearFailedByDefault,
+            settings.ClearAllByDefault);
 
         if (dialog.ShowDialog(this) != DialogResult.OK)
         {
@@ -1299,6 +1597,9 @@ public class MainForm : Form
             dialog.ClearCompletedWhenAddingUrls;
         settings.RememberDestinationPerUrlAddition =
             dialog.RememberDestinationPerUrlAddition;
+        settings.ClearCompletedByDefault = dialog.ClearCompletedByDefault;
+        settings.ClearFailedByDefault = dialog.ClearFailedByDefault;
+        settings.ClearAllByDefault = dialog.ClearAllByDefault;
         settings.Save();
     }
 
@@ -1315,6 +1616,12 @@ public class MainForm : Form
         btnSelectFile.Enabled = !downloading;
         btnSelectDestination.Enabled = !downloading;
         numConcurrent.Enabled = !downloading;
+        btnClear.Enabled = !downloading && queuedItems.Count > 0;
+        queueToolTip.SetToolTip(
+            btnStart,
+            downloading
+                ? "Stop het starten van nieuwe downloads; actieve downloads worden afgerond."
+                : "Start de wachtende downloads.");
 
         if (downloading)
         {
@@ -1337,6 +1644,7 @@ public class MainForm : Form
         btnStart.Enabled =
             queuedItems.Any(item => !processedItems.ContainsKey(item.QueueKey)) &&
             !string.IsNullOrWhiteSpace(txtDestination.Text);
+        btnClear.Enabled = queuedItems.Count > 0;
 
         UpdateActionButtonAppearance();
     }
