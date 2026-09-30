@@ -255,35 +255,70 @@ internal sealed class FacebookAlbumResolverDialog : Form
 
         var json = await webView.CoreWebView2.ExecuteScriptAsync("""
             (() => {
-                const items = [];
+                function collect(root) {
+                    const items = [];
+                    const seen = new Set();
+
+                    function add(url, width, height) {
+                        if (!url || seen.has(url)) return;
+                        if (!/fbcdn\.net|fbsbx\.com/i.test(url)) return;
+                        if (!/\.(jpe?g|png|webp)(\?|$)/i.test(url)) return;
+                        seen.add(url);
+                        items.push({
+                            url,
+                            width: Number(width) || 0,
+                            height: Number(height) || 0
+                        });
+                    }
+
+                    for (const img of root.querySelectorAll('img')) {
+                        add(
+                            img.currentSrc || img.src,
+                            img.naturalWidth,
+                            img.naturalHeight
+                        );
+
+                        if (img.srcset) {
+                            for (const part of img.srcset.split(',')) {
+                                add(part.trim().split(/\s+/)[0], 0, 0);
+                            }
+                        }
+                    }
+
+                    return items;
+                }
+
+                const photoContainer = document.querySelector('div.html-div');
+                const scopedItems = photoContainer ? collect(photoContainer) : [];
+
+                if (scopedItems.length > 0) {
+                    return scopedItems;
+                }
+
+                const pageItems = collect(document);
+
+                if (pageItems.length > 0) {
+                    return pageItems;
+                }
+
+                const resources = [];
                 const seen = new Set();
 
-                function add(url, width, height) {
-                    if (!url || seen.has(url)) return;
-                    if (!/fbcdn\.net|fbsbx\.com/i.test(url)) return;
-                    if (!/\.(jpe?g|png|webp)(\?|$)/i.test(url)) return;
+                for (const entry of performance.getEntriesByType('resource')) {
+                    const url = entry.name || '';
+                    if (!url || seen.has(url)) continue;
+                    if (!/fbcdn\.net|fbsbx\.com/i.test(url)) continue;
+                    if (!/\.(jpe?g|png|webp)(\?|$)/i.test(url)) continue;
+
                     seen.add(url);
-                    items.push({
+                    resources.push({
                         url,
-                        width: Number(width) || 0,
-                        height: Number(height) || 0
+                        width: 0,
+                        height: 0
                     });
                 }
 
-                for (const img of document.images) {
-                    add(img.currentSrc || img.src, img.naturalWidth, img.naturalHeight);
-                    if (img.srcset) {
-                        for (const part of img.srcset.split(',')) {
-                            add(part.trim().split(/\s+/)[0], 0, 0);
-                        }
-                    }
-                }
-
-                for (const entry of performance.getEntriesByType('resource')) {
-                    add(entry.name, 0, 0);
-                }
-
-                return items;
+                return resources;
             })();
             """);
 
