@@ -286,7 +286,9 @@ internal sealed class FacebookAlbumResolverDialog : Form
             })();
             """);
 
-        var candidates = JsonSerializer.Deserialize<List<ImageCandidate>>(json)
+        var candidates = JsonSerializer.Deserialize<List<ImageCandidate>>(
+            json,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
             ?? [];
 
         var best = candidates
