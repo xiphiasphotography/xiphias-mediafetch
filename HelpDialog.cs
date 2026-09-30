@@ -57,6 +57,61 @@ internal sealed class HelpDialog : Form
             Dezelfde URL mag meerdere keren in de wachtrij staan wanneer de doelmap verschilt.
             """));
 
+        tabs.TabPages.Add(CreatePage("Facebook", """
+            FACEBOOK-ALBUMS
+
+            Plak één Facebook-album-URL met Ctrl+V in de wachtrij. MediaFetch herkent URL's in de vorm:
+
+            https://www.facebook.com/media/set/?set=a....&type=3
+
+            Eerst verschijnt een dialoog met de instellingen voor dat album.
+
+            Doelmap
+            Kies hier rechtstreeks waar de foto's van dit album moeten worden opgeslagen. Deze map blijft voor de Facebook-foto's behouden, ook wanneer de algemene instelling 'Doelmap per toevoegactie onthouden' uitstaat.
+
+            Bestandsnaam
+            De standaardtemplate is [N].[E].
+
+            Beschikbare placeholders:
+            [N]  originele Facebook-bestandsnaam zonder extensie
+            [E]  extensie zonder punt
+            [C]  oplopende counter in albumvolgorde
+            [X]  waarde uit de ingebouwde Hot Toys Blogger-regex
+
+            Startnummer staat bij ieder nieuw album standaard op 1. Met Aantal cijfers bepaal je de voorloopnullen. Bij 3 cijfers wordt de reeks bijvoorbeeld 001, 002, ... 010, ... 100.
+
+            Voorbeelden:
+
+            [C].[E]
+            001.jpg
+            002.jpg
+
+            Hot Toys Blogger-foto's
+            Dit vinkje vult automatisch de template in:
+
+            Z[C]-FB_IMG_[X].[E]
+
+            De Facebook-bestandsnaam:
+
+            715592432_1427899362707405_8122620896771832055_n.jpg
+
+            wordt dan voor de eerste foto:
+
+            Z001-FB_IMG_8122620896771832055.jpg
+
+            Als het bekende Facebook-patroon niet matcht, gebruikt [X] veilig dezelfde waarde als [N].
+
+            Album analyseren
+            Na de instellingen opent het Facebook-album in een afzonderlijke WebView2-browser. Meld je daar zo nodig aan bij Facebook en klik op Album analyseren. MediaFetch doorloopt eerst het album om de volgorde vast te leggen en opent daarna de foto's om de grootste geladen Facebook/CDN-afbeelding te kiezen.
+
+            De Facebook-browsersessie wordt lokaal bewaard in een apart profiel onder:
+            %LOCALAPPDATA%\XiPHiAS\MediaFetch\WebView2\Facebook
+
+            MediaFetch bewaart je Facebook-wachtwoord niet in settings.json. De laatst gebruikte template, doelmap, Hot Toys-keuze en het aantal cijfers worden onthouden; het startnummer begint bij een nieuw album opnieuw op 1.
+
+            Dit is een beta-functie. Facebook kan de webinterface wijzigen, waardoor albumherkenning of high-res-resolving later aangepast moet worden.
+            """));
+
         tabs.TabPages.Add(CreatePage("YouTube", """
             YOUTUBE DOWNLOADEN
 
