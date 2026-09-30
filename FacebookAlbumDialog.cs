@@ -116,7 +116,7 @@ internal sealed class FacebookAlbumDialog : Form
         };
         var okButton = new Button
         {
-            Text = "Album analyseren",
+            Text = "Analyseren",
             Width = 145,
             Height = 34
         };
