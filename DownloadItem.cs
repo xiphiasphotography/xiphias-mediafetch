@@ -24,6 +24,8 @@ public class DownloadItem
 
     public bool IsYouTube { get; set; }
 
+    public bool PreserveDestinationPath { get; set; }
+
     public TimeSpan? MediaDuration { get; set; }
 
     public int? ProgressOverride { get; set; }
