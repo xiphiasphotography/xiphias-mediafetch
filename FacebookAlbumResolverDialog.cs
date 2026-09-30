@@ -23,7 +23,7 @@ internal sealed class FacebookAlbumResolverDialog : Form
     };
     private readonly Button analyzeButton = new()
     {
-        Text = "Album analyseren",
+        Text = "Analyseren",
         Width = 140,
         Height = 34,
         Enabled = false
