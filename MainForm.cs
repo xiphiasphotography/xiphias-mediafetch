@@ -672,7 +672,7 @@ public class MainForm : Form
 
         if (!settings.RememberDestinationPerUrlAddition)
         {
-            foreach (var item in items)
+            foreach (var item in items.Where(item => !item.PreserveDestinationPath))
             {
                 item.DestinationPath = Path.Combine(
                     txtDestination.Text.Trim(),
@@ -1072,7 +1072,7 @@ public class MainForm : Form
         }
     }
 
-    private void PasteUrlsIntoQueue()
+    private async void PasteUrlsIntoQueue()
     {
         if (isDownloading || !Clipboard.ContainsText())
         {
@@ -1080,6 +1080,16 @@ public class MainForm : Form
         }
 
         var clipboardText = Clipboard.GetText();
+        var urls = ReadUrlsFromText(clipboardText).ToList();
+
+        if (urls.Count == 1 &&
+            FacebookAlbumResolverDialog.IsFacebookAlbumUrl(urls[0]))
+        {
+            await AddFacebookAlbumAsync(urls[0]);
+            listDownloads.Focus();
+            return;
+        }
+
         var destination = txtDestination.Text.Trim();
 
         if (settings.RememberDestinationPerUrlAddition)
@@ -1119,6 +1129,114 @@ public class MainForm : Form
 
         AddUrlsToQueue(ReadUrlsFromText(clipboardText), destination);
         listDownloads.Focus();
+    }
+
+    private async Task AddFacebookAlbumAsync(string albumUrl)
+    {
+        var initialDestination =
+            Directory.Exists(settings.FacebookLastDestinationDirectory)
+                ? settings.FacebookLastDestinationDirectory!
+                : txtDestination.Text.Trim();
+
+        using var settingsDialog = new FacebookAlbumDialog(
+            albumUrl,
+            initialDestination,
+            settings.FacebookFileNameTemplate,
+            settings.FacebookHotToysBloggerMode,
+            settings.FacebookCounterDigits);
+
+        if (settingsDialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        settings.FacebookFileNameTemplate = settingsDialog.FileNameTemplate;
+        settings.FacebookHotToysBloggerMode =
+            settingsDialog.HotToysBloggerMode;
+        settings.FacebookCounterDigits = settingsDialog.CounterDigits;
+        settings.FacebookLastDestinationDirectory =
+            settingsDialog.DestinationDirectory;
+        settings.Save();
+
+        using var resolver = new FacebookAlbumResolverDialog(albumUrl);
+        if (resolver.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        var entries = resolver.Photos
+            .OrderBy(photo => photo.AlbumIndex)
+            .Select((photo, index) =>
+            {
+                var fileName = FacebookFileNameFormatter.Format(
+                    settingsDialog.FileNameTemplate,
+                    photo.OriginalFileName,
+                    settingsDialog.StartNumber + index,
+                    settingsDialog.CounterDigits,
+                    settingsDialog.HotToysBloggerMode);
+
+                return (
+                    photo.ResolvedUrl,
+                    fileName,
+                    settingsDialog.DestinationDirectory
+                );
+            })
+            .ToList();
+
+        AddResolvedUrlsToQueue(entries);
+        lblSummary.Text =
+            $"{entries.Count} Facebook-foto's aan de wachtrij toegevoegd";
+
+        await Task.CompletedTask;
+    }
+
+    private void AddResolvedUrlsToQueue(
+        IEnumerable<(string Url, string FileName, string DestinationDirectory)> entries)
+    {
+        if (isDownloading)
+        {
+            return;
+        }
+
+        if (settings.ClearCompletedWhenAddingUrls)
+        {
+            RemoveCompletedItems();
+        }
+
+        foreach (var entry in entries)
+        {
+            var key = $"{entry.Url}\n{entry.DestinationDirectory}";
+
+            if (!queuedItemKeys.Add(key))
+            {
+                continue;
+            }
+
+            var item = new DownloadItem
+            {
+                QueueKey = key,
+                Url = entry.Url,
+                FileName = entry.FileName,
+                DestinationPath = Path.Combine(
+                    entry.DestinationDirectory,
+                    entry.FileName),
+                PreserveDestinationPath = true
+            };
+
+            queuedItems.Add(item);
+            var row = new ListViewItem(FormatFileNameForQueue(item.FileName));
+            row.SubItems.Add("0%");
+            row.SubItems.Add("—");
+            row.SubItems.Add("—");
+            row.SubItems.Add("—");
+            row.SubItems.Add("Waiting");
+            row.SubItems.Add(FormatDestinationForQueue(item.DestinationPath));
+            row.Tag = item;
+            listDownloads.Items.Add(row);
+            queueRows.Add(key, row);
+        }
+
+        UpdateActionButtonState();
     }
 
     private void AddUrlsToQueue(IEnumerable<string> urls, string destinationDirectory)
