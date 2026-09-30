@@ -549,9 +549,22 @@ public class MainForm : Form
 
     private bool EnsureDestinationDirectories(IEnumerable<DownloadItem> items)
     {
-        var directories = settings.RememberDestinationPerUrlAddition
-            ? items.Select(item => Path.GetDirectoryName(item.DestinationPath))
-            : [txtDestination.Text.Trim()];
+        IEnumerable<string?> directories;
+
+        if (settings.RememberDestinationPerUrlAddition)
+        {
+            directories = items.Select(item =>
+                Path.GetDirectoryName(item.DestinationPath));
+        }
+        else
+        {
+            directories = items
+                .Where(item => item.PreserveDestinationPath)
+                .Select(item => Path.GetDirectoryName(item.DestinationPath))
+                .Concat(items.Any(item => !item.PreserveDestinationPath)
+                    ? [txtDestination.Text.Trim()]
+                    : []);
+        }
 
         foreach (var directory in directories
             .Where(directory => !string.IsNullOrWhiteSpace(directory))
