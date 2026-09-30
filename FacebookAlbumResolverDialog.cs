@@ -203,30 +203,65 @@ internal sealed class FacebookAlbumResolverDialog : Form
         var stablePasses = 0;
         var previousCount = -1;
 
+        var albumSet = GetQueryParameter(albumUrl, "set");
+
         for (var pass = 0; pass < 80 && stablePasses < 4; pass++)
         {
             var result = await webView.CoreWebView2.ExecuteScriptAsync("""
                 (() => {
-                    const result = [];
-                    for (const a of document.querySelectorAll('a[href]')) {
-                        const href = a.href || '';
-                        if (
-                            href.includes('/photo/?fbid=') ||
-                            href.includes('/photo.php?fbid=') ||
-                            (href.includes('/photos/') && href.includes('facebook.com'))
-                        ) {
-                            result.push(href);
+                    function collect(root) {
+                        const result = [];
+
+                        for (const a of root.querySelectorAll('a[href]')) {
+                            const href = a.href || '';
+                            if (
+                                href.includes('/photo/?fbid=') ||
+                                href.includes('/photo.php?fbid=') ||
+                                (href.includes('/photos/') &&
+                                 href.includes('facebook.com'))
+                            ) {
+                                result.push(href);
+                            }
                         }
+
+                        return result;
                     }
+
+                    const albumContainer =
+                        document.querySelector('div.html-div');
+                    const scopedLinks = albumContainer
+                        ? collect(albumContainer)
+                        : [];
+
                     window.scrollTo(0, Math.max(
                         document.body.scrollHeight,
                         document.documentElement.scrollHeight
                     ));
-                    return result;
+
+                    return scopedLinks.length > 0
+                        ? scopedLinks
+                        : collect(document);
                 })();
                 """);
 
-            foreach (var link in DeserializeStringArray(result))
+            var discoveredLinks = DeserializeStringArray(result);
+
+            if (!string.IsNullOrWhiteSpace(albumSet))
+            {
+                var matchingAlbumLinks = discoveredLinks
+                    .Where(link => string.Equals(
+                        GetQueryParameter(link, "set"),
+                        albumSet,
+                        StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                if (matchingAlbumLinks.Count > 0)
+                {
+                    discoveredLinks = matchingAlbumLinks;
+                }
+            }
+
+            foreach (var link in discoveredLinks)
             {
                 var key = GetPhotoKey(link);
                 if (seen.Add(key))
@@ -390,6 +425,29 @@ internal sealed class FacebookAlbumResolverDialog : Form
         });
 
         await completion.Task;
+    }
+
+    private static string? GetQueryParameter(
+        string url,
+        string parameterName)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return null;
+
+        foreach (var part in uri.Query.TrimStart('?')
+            .Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var pair = part.Split('=', 2);
+            if (pair.Length == 2 &&
+                pair[0].Equals(
+                    parameterName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return Uri.UnescapeDataString(pair[1]);
+            }
+        }
+
+        return null;
     }
 
     private static string GetPhotoKey(string url)
