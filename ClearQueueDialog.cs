@@ -4,31 +4,37 @@ internal sealed class ClearQueueDialog : Form
 {
     private readonly CheckBox completedCheckBox;
     private readonly CheckBox failedCheckBox;
+    private readonly CheckBox skippedCheckBox;
     private readonly CheckBox allCheckBox;
     private readonly Label summaryLabel;
     private readonly Button clearButton;
     private readonly int completedCount;
     private readonly int failedCount;
+    private readonly int skippedCount;
     private readonly int totalCount;
 
     public bool RemoveCompleted => completedCheckBox.Checked;
     public bool RemoveFailed => failedCheckBox.Checked;
+    public bool RemoveSkipped => skippedCheckBox.Checked;
     public bool RemoveAll => allCheckBox.Checked;
 
     public ClearQueueDialog(
         int completedCount,
         int failedCount,
+        int skippedCount,
         int totalCount,
         bool removeCompleted,
         bool removeFailed,
+        bool removeSkipped,
         bool removeAll)
     {
         this.completedCount = completedCount;
         this.failedCount = failedCount;
+        this.skippedCount = skippedCount;
         this.totalCount = totalCount;
 
         Text = "Downloadlijst leegmaken";
-        ClientSize = new Size(520, 255);
+        ClientSize = new Size(520, 285);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -62,11 +68,20 @@ internal sealed class ClearQueueDialog : Form
             Checked = removeFailed
         };
 
+        skippedCheckBox = new CheckBox
+        {
+            Text = $"Skipped ({skippedCount})",
+            Left = 330,
+            Top = 55,
+            Width = 150,
+            Checked = removeSkipped
+        };
+
         allCheckBox = new CheckBox
         {
             Text = $"Alles ({totalCount})",
-            Left = 330,
-            Top = 55,
+            Left = 20,
+            Top = 88,
             Width = 150,
             Checked = removeAll
         };
@@ -74,7 +89,7 @@ internal sealed class ClearQueueDialog : Form
         summaryLabel = new Label
         {
             Left = 20,
-            Top = 98,
+            Top = 128,
             Width = 480,
             Height = 48
         };
@@ -83,7 +98,7 @@ internal sealed class ClearQueueDialog : Form
         {
             Text = "Verwijderen",
             Left = 275,
-            Top = 190,
+            Top = 220,
             Width = 110,
             Height = 36,
             DialogResult = DialogResult.OK
@@ -93,7 +108,7 @@ internal sealed class ClearQueueDialog : Form
         {
             Text = "Annuleren",
             Left = 395,
-            Top = 190,
+            Top = 220,
             Width = 105,
             Height = 36,
             DialogResult = DialogResult.Cancel
@@ -101,11 +116,13 @@ internal sealed class ClearQueueDialog : Form
 
         completedCheckBox.CheckedChanged += (_, _) => UpdateSelection();
         failedCheckBox.CheckedChanged += (_, _) => UpdateSelection();
+        skippedCheckBox.CheckedChanged += (_, _) => UpdateSelection();
         allCheckBox.CheckedChanged += (_, _) => UpdateSelection();
 
         Controls.AddRange([
             completedCheckBox,
             failedCheckBox,
+            skippedCheckBox,
             allCheckBox,
             summaryLabel,
             clearButton,
@@ -121,11 +138,13 @@ internal sealed class ClearQueueDialog : Form
     {
         completedCheckBox.Enabled = !allCheckBox.Checked;
         failedCheckBox.Enabled = !allCheckBox.Checked;
+        skippedCheckBox.Enabled = !allCheckBox.Checked;
 
         var removeCount = allCheckBox.Checked
             ? totalCount
             : (completedCheckBox.Checked ? completedCount : 0) +
-              (failedCheckBox.Checked ? failedCount : 0);
+              (failedCheckBox.Checked ? failedCount : 0) +
+              (skippedCheckBox.Checked ? skippedCount : 0);
 
         summaryLabel.Text = removeCount == 0
             ? "Er zijn met deze selectie geen regels om te verwijderen."

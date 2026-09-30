@@ -648,6 +648,27 @@ public class MainForm : Form
         }
 
         using var downloader = new Downloader(settings.UserAgent, referer);
+        var youtubeItems = items
+            .Where(item => YouTubeDownloader.IsYouTubeUrl(item.Url))
+            .ToList();
+        IReadOnlyList<System.Net.Cookie> youtubeCookies = [];
+        if (youtubeItems.Count > 0 && YouTubeSessionManager.HasSavedSession)
+        {
+            lblSummary.Text = "YouTube-sessie laden...";
+            try
+            {
+                youtubeCookies = await YouTubeSessionManager.GetCookiesAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"De opgeslagen YouTube-sessie kon niet worden geladen. MediaFetch probeert anoniem verder.\n\n{ex.Message}",
+                    "YouTube-sessie",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+        }
+        using var youtubeDownloader = new YouTubeDownloader(youtubeCookies);
 
         if (!settings.RememberDestinationPerUrlAddition)
         {
@@ -659,6 +680,49 @@ public class MainForm : Form
 
                 queueRows[item.QueueKey].SubItems[6].Text =
                     FormatDestinationForQueue(item.DestinationPath);
+            }
+        }
+
+        if (youtubeItems.Count > 0)
+        {
+            UseWaitCursor = true;
+            btnStart.Enabled = false;
+            lblSummary.Text = "YouTube-video's voorbereiden...";
+
+            try
+            {
+                foreach (var item in youtubeItems)
+                {
+                    try
+                    {
+                        await youtubeDownloader.PrepareAsync(item, CancellationToken.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        item.ErrorMessage = ex.Message;
+                        item.Status = $"Failed: {ex.Message}";
+                        queueRows[item.QueueKey].SubItems[5].Text = item.Status;
+                        throw;
+                    }
+
+                    var row = queueRows[item.QueueKey];
+                    row.Text = FormatFileNameForQueue(item.FileName);
+                    row.SubItems[6].Text = FormatDestinationForQueue(item.DestinationPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"De YouTube-video kon niet worden voorbereid:\n\n{ex.Message}",
+                    "XiPHiAS MediaFetch",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return;
+            }
+            finally
+            {
+                UseWaitCursor = false;
+                UpdateActionButtonState();
             }
         }
 
@@ -802,11 +866,10 @@ public class MainForm : Form
                                     }
 
                                     row.SubItems[1].Text =
+                                        current.ProgressOverride.HasValue ||
                                         current.TotalBytes.HasValue
                                             ? $"{current.Progress}%"
-                                            : FormatBytes(
-                                                current.BytesDownloaded
-                                            );
+                                            : FormatBytes(current.BytesDownloaded);
 
                                     row.SubItems[2].Text =
                                         current.TotalBytes.HasValue
@@ -825,11 +888,20 @@ public class MainForm : Form
                                         current.Status;
                                 });
 
-                        await downloader.DownloadAsync(
-                            item,
-                            progress,
-                            CancellationToken.None
-                        );
+                        if (item.IsYouTube)
+                        {
+                            await youtubeDownloader.DownloadAsync(
+                                item,
+                                progress,
+                                CancellationToken.None);
+                        }
+                        else
+                        {
+                            await downloader.DownloadAsync(
+                                item,
+                                progress,
+                                CancellationToken.None);
+                        }
 
                         processedItems.TryAdd(item.QueueKey, 0);
                         Interlocked.Increment(ref downloaded);
@@ -837,8 +909,17 @@ public class MainForm : Form
                     catch (OperationCanceledException)
                     {
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        item.ErrorMessage = ex.Message;
+                        item.Status = $"Failed: {ex.Message}";
+                        Invoke((Action)(() =>
+                        {
+                            if (queueRows.TryGetValue(item.QueueKey, out var row))
+                            {
+                                row.SubItems[5].Text = item.Status;
+                            }
+                        }));
                         failed.Add(item);
                     }
                     finally
@@ -880,8 +961,9 @@ public class MainForm : Form
                     StringComparer.OrdinalIgnoreCase))
             {
                 await File.WriteAllLinesAsync(
-                    Path.Combine(group.Key, "failed.txt"),
-                    group.Select(item => item.Url));
+                    Path.Combine(group.Key, "failed.log"),
+                    group.Select(item =>
+                        $"{item.FileName} | {FormatFailureForLog(item)} | URL: {item.Url}"));
             }
         }
 
@@ -1279,13 +1361,16 @@ public class MainForm : Form
 
         var completedCount = queuedItems.Count(IsCompletedItem);
         var failedCount = queuedItems.Count(IsFailedItem);
+        var skippedCount = queuedItems.Count(IsSkippedItem);
 
         using var dialog = new ClearQueueDialog(
             completedCount,
             failedCount,
+            skippedCount,
             queuedItems.Count,
             settings.ClearCompletedByDefault,
             settings.ClearFailedByDefault,
+            settings.ClearSkippedByDefault,
             settings.ClearAllByDefault);
 
         if (dialog.ShowDialog(this) != DialogResult.OK)
@@ -1296,7 +1381,8 @@ public class MainForm : Form
         var itemsToRemove = queuedItems
             .Where(item => dialog.RemoveAll ||
                 (dialog.RemoveCompleted && IsCompletedItem(item)) ||
-                (dialog.RemoveFailed && IsFailedItem(item)))
+                (dialog.RemoveFailed && IsFailedItem(item)) ||
+                (dialog.RemoveSkipped && IsSkippedItem(item)))
             .ToList();
 
         RemoveQueueItems(itemsToRemove);
@@ -1319,6 +1405,11 @@ public class MainForm : Form
          row.SubItems[5].Text.StartsWith(
              "Failed",
              StringComparison.OrdinalIgnoreCase));
+
+    private bool IsSkippedItem(DownloadItem item) =>
+        item.Status == "Skipped" ||
+        (queueRows.TryGetValue(item.QueueKey, out var row) &&
+         row.SubItems[5].Text == "Skipped");
 
     private void RemoveQueueItems(IEnumerable<DownloadItem> items)
     {
@@ -1412,6 +1503,22 @@ public class MainForm : Form
             : eta.Value.ToString(@"mm\:ss");
     }
 
+    private static string FormatFailureForLog(DownloadItem item)
+    {
+        var message = item.ErrorMessage;
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            message = item.Status.StartsWith("Failed:", StringComparison.OrdinalIgnoreCase)
+                ? item.Status[7..].Trim()
+                : item.Status;
+        }
+
+        return message
+            .Replace('\r', ' ')
+            .Replace('\n', ' ')
+            .Trim();
+    }
+
     private static async Task DetectCompleteFilesAsync(
         Downloader downloader,
         IReadOnlyCollection<DownloadItem> existingItems)
@@ -1420,6 +1527,12 @@ public class MainForm : Form
 
         await Task.WhenAll(existingItems.Select(async item =>
         {
+            if (item.IsYouTube)
+            {
+                item.ExistingFileIsComplete = true;
+                return;
+            }
+
             await semaphore.WaitAsync();
 
             try
@@ -1558,6 +1671,7 @@ public class MainForm : Form
             settings.RememberDestinationPerUrlAddition,
             settings.ClearCompletedByDefault,
             settings.ClearFailedByDefault,
+            settings.ClearSkippedByDefault,
             settings.ClearAllByDefault);
 
         if (dialog.ShowDialog(this) != DialogResult.OK)
@@ -1599,6 +1713,7 @@ public class MainForm : Form
             dialog.RememberDestinationPerUrlAddition;
         settings.ClearCompletedByDefault = dialog.ClearCompletedByDefault;
         settings.ClearFailedByDefault = dialog.ClearFailedByDefault;
+        settings.ClearSkippedByDefault = dialog.ClearSkippedByDefault;
         settings.ClearAllByDefault = dialog.ClearAllByDefault;
         settings.Save();
     }

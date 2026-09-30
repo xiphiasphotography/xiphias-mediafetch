@@ -83,6 +83,9 @@ public sealed class Downloader : IDisposable
                             : $"Retry {attempt}/{maxRetries}"
                         : $"Failed: {ex.Message}";
 
+                if (attempt >= maxRetries)
+                    item.ErrorMessage = ex.Message;
+
                 progress?.Report(item);
 
                 if (attempt >= maxRetries)

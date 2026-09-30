@@ -59,6 +59,7 @@ internal sealed class SettingsDialog : Form
     private readonly CheckBox rememberDestinationCheckBox;
     private readonly CheckBox clearCompletedByDefaultCheckBox;
     private readonly CheckBox clearFailedByDefaultCheckBox;
+    private readonly CheckBox clearSkippedByDefaultCheckBox;
     private readonly CheckBox clearAllByDefaultCheckBox;
 
     public string UserAgent => userAgentTextBox.Text.Trim();
@@ -66,6 +67,7 @@ internal sealed class SettingsDialog : Form
     public bool RememberDestinationPerUrlAddition => rememberDestinationCheckBox.Checked;
     public bool ClearCompletedByDefault => clearCompletedByDefaultCheckBox.Checked;
     public bool ClearFailedByDefault => clearFailedByDefaultCheckBox.Checked;
+    public bool ClearSkippedByDefault => clearSkippedByDefaultCheckBox.Checked;
     public bool ClearAllByDefault => clearAllByDefaultCheckBox.Checked;
 
     public SettingsDialog(
@@ -74,10 +76,11 @@ internal sealed class SettingsDialog : Form
         bool rememberDestinationPerUrlAddition,
         bool clearCompletedByDefault,
         bool clearFailedByDefault,
+        bool clearSkippedByDefault,
         bool clearAllByDefault)
     {
         Text = "Instellingen";
-        ClientSize = new Size(720, 465);
+        ClientSize = new Size(720, 590);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -170,11 +173,111 @@ internal sealed class SettingsDialog : Form
             ForeColor = SystemColors.GrayText
         };
 
+        var youtubeGroup = new GroupBox
+        {
+            Text = "YouTube-account (optioneel)",
+            Left = 20,
+            Top = 280,
+            Width = 680,
+            Height = 110
+        };
+        var youtubeStatusLabel = new Label
+        {
+            Text = YouTubeSessionManager.HasSavedSession
+                ? "Status: sessie controleren..."
+                : "Status: niet aangemeld",
+            Left = 16,
+            Top = 31,
+            Width = 330
+        };
+        var youtubeLoginButton = new Button
+        {
+            Text = "Aanmelden...",
+            Left = 410,
+            Top = 24,
+            Width = 115,
+            Height = 32
+        };
+        var youtubeLogoutButton = new Button
+        {
+            Text = "Afmelden",
+            Left = 535,
+            Top = 24,
+            Width = 115,
+            Height = 32,
+            Enabled = YouTubeSessionManager.HasSavedSession
+        };
+        var youtubeHint = new Label
+        {
+            Text = "De sessie blijft in een eigen WebView2-profiel en wordt niet opgeslagen in settings.json.",
+            Left = 16,
+            Top = 70,
+            Width = 640,
+            ForeColor = SystemColors.GrayText
+        };
+
+        youtubeLoginButton.Click += (_, _) =>
+        {
+            using var loginDialog = new YouTubeLoginDialog();
+            if (loginDialog.ShowDialog(this) == DialogResult.OK)
+            {
+                youtubeStatusLabel.Text = "Status: aangemeld bij YouTube";
+                youtubeLogoutButton.Enabled = true;
+            }
+        };
+        youtubeLogoutButton.Click += async (_, _) =>
+        {
+            youtubeLoginButton.Enabled = false;
+            youtubeLogoutButton.Enabled = false;
+            youtubeStatusLabel.Text = "Status: afmelden...";
+            try
+            {
+                await YouTubeSessionManager.SignOutAsync();
+                youtubeStatusLabel.Text = "Status: niet aangemeld";
+            }
+            catch (Exception ex)
+            {
+                youtubeStatusLabel.Text = "Status: afmelden mislukt";
+                MessageBox.Show(ex.Message, "YouTube afmelden",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                youtubeLogoutButton.Enabled = true;
+            }
+            finally
+            {
+                youtubeLoginButton.Enabled = true;
+            }
+        };
+        youtubeGroup.Controls.AddRange([
+            youtubeStatusLabel,
+            youtubeLoginButton,
+            youtubeLogoutButton,
+            youtubeHint
+        ]);
+
+        Shown += async (_, _) =>
+        {
+            if (!YouTubeSessionManager.HasSavedSession)
+                return;
+
+            try
+            {
+                var valid = await YouTubeSessionManager.HasValidSessionAsync();
+                youtubeStatusLabel.Text = valid
+                    ? "Status: aangemeld bij YouTube"
+                    : "Status: sessie verlopen; meld opnieuw aan";
+                youtubeLogoutButton.Enabled = true;
+            }
+            catch
+            {
+                youtubeStatusLabel.Text = "Status: sessie kon niet worden gecontroleerd";
+            }
+        };
+
         var clearGroup = new GroupBox
         {
             Text = "Clear-functionaliteit — standaardselectie",
             Left = 20,
-            Top = 280,
+            Top = 405,
             Width = 680,
             Height = 120
         };
@@ -197,10 +300,19 @@ internal sealed class SettingsDialog : Form
             Checked = clearFailedByDefault
         };
 
+        clearSkippedByDefaultCheckBox = new CheckBox
+        {
+            Text = "Skipped",
+            Left = 270,
+            Top = 28,
+            Width = 100,
+            Checked = clearSkippedByDefault
+        };
+
         clearAllByDefaultCheckBox = new CheckBox
         {
             Text = "Alles",
-            Left = 270,
+            Left = 390,
             Top = 28,
             Width = 100,
             Checked = clearAllByDefault
@@ -221,6 +333,8 @@ internal sealed class SettingsDialog : Form
                 !clearAllByDefaultCheckBox.Checked;
             clearFailedByDefaultCheckBox.Enabled =
                 !clearAllByDefaultCheckBox.Checked;
+            clearSkippedByDefaultCheckBox.Enabled =
+                !clearAllByDefaultCheckBox.Checked;
         }
 
         clearAllByDefaultCheckBox.CheckedChanged += (_, _) =>
@@ -229,6 +343,7 @@ internal sealed class SettingsDialog : Form
         clearGroup.Controls.AddRange([
             clearCompletedByDefaultCheckBox,
             clearFailedByDefaultCheckBox,
+            clearSkippedByDefaultCheckBox,
             clearAllByDefaultCheckBox,
             clearHint
         ]);
@@ -237,7 +352,7 @@ internal sealed class SettingsDialog : Form
         {
             Text = "Opslaan",
             Left = 480,
-            Top = 415,
+            Top = 540,
             Width = 105,
             Height = 35,
             DialogResult = DialogResult.OK
@@ -247,7 +362,7 @@ internal sealed class SettingsDialog : Form
         {
             Text = "Annuleren",
             Left = 595,
-            Top = 415,
+            Top = 540,
             Width = 105,
             Height = 35,
             DialogResult = DialogResult.Cancel
@@ -264,6 +379,7 @@ internal sealed class SettingsDialog : Form
             clearCompletedCheckBox,
             rememberDestinationCheckBox,
             destinationHint,
+            youtubeGroup,
             clearGroup,
             saveButton,
             cancelButton

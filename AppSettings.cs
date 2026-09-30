@@ -32,6 +32,7 @@ internal sealed class AppSettings
     public bool RememberDestinationPerUrlAddition { get; set; }
     public bool ClearCompletedByDefault { get; set; } = true;
     public bool ClearFailedByDefault { get; set; } = true;
+    public bool ClearSkippedByDefault { get; set; } = true;
     public bool ClearAllByDefault { get; set; }
 
     public static AppSettings Load()

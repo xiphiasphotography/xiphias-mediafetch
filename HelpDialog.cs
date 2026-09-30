@@ -28,7 +28,7 @@ internal sealed class HelpDialog : Form
 
             Bij bestaande bestanden kun je kiezen voor overschrijven, overslaan of hernoemen. Met Stop worden geen nieuwe downloads gestart; actieve downloads mogen eerst netjes eindigen.
 
-            Met Clear verwijder je regels uit de downloadlijst. Voor het verwijderen verschijnt een venster waarin je Completed, Failed of Alles kunt kiezen en het aantal te verwijderen regels ziet. Bestanden op schijf worden niet verwijderd.
+            Met Clear verwijder je regels uit de downloadlijst. Voor het verwijderen verschijnt een venster waarin je Completed, Failed, Skipped of Alles kunt kiezen en het aantal te verwijderen regels ziet. Bestanden op schijf worden niet verwijderd.
 
             Alleen volledige http- en https-URL's worden toegevoegd. Lege regels en ongeldige regels worden overgeslagen.
             """));
@@ -57,6 +57,31 @@ internal sealed class HelpDialog : Form
             Dezelfde URL mag meerdere keren in de wachtrij staan wanneer de doelmap verschilt.
             """));
 
+        tabs.TabPages.Add(CreatePage("YouTube", """
+            YOUTUBE DOWNLOADEN
+
+            Plak een normale YouTube-, youtu.be- of embed-URL in de wachtrij, of zet deze als volledige URL in een URL-bestand. yt-dlp en Deno halen bij Start de videotitel en beschikbare streams op; MediaFetch downloadt de gekozen streams vervolgens zelf.
+
+            De videostream met de hoogste beschikbare resolutie en de audiostream met de hoogste bitrate worden afzonderlijk gedownload. Daarna voegt FFmpeg beide streams zonder hercodering samen in een MKV-bestand. Daardoor blijft de oorspronkelijke kwaliteit behouden.
+
+            In de gekozen doelmap worden naast elkaar opgeslagen:
+
+            Videotitel.video.webm   Originele videostream (extensie kan verschillen)
+            Videotitel.audio.webm   Originele audiostream (extensie kan verschillen)
+            Videotitel.mkv          Samengevoegde video met audio
+            Videotitel.jpg          Hoogst beschikbare thumbnail
+
+            De wachtrij toont afzonderlijk de voortgang van thumbnail, video, audio en samenvoegen. Samenvoegen gebeurt asynchroon; maximaal één FFmpeg-proces tegelijk voorkomt onnodige schijfbelasting. Andere downloads kunnen ondertussen doorgaan.
+
+            Vereist zijn yt-dlp.exe, deno.exe en ffmpeg.exe. Plaats ze naast XiPHiAS.MediaFetch.exe, in de submap tools, of zorg dat ze via PATH beschikbaar zijn. Voor FFmpeg wordt ook de submap ffmpeg ondersteund. Gebruik de officiële yt-dlp.exe; deze bevat de EJS-challengescripts. Als samenvoegen mislukt, blijven de gedownloade bronbestanden behouden.
+
+            Sommige video's werken alleen met een browsersessie. Ga dan naar Instellingen > YouTube-account en kies Aanmelden. MediaFetch probeert yt-dlp eerst zonder cookies. Alleen na een mislukking wordt voor de fallback tijdelijk een cookiesbestand gemaakt en direct daarna verwijderd.
+
+            De sessie staat in een eigen profiel onder LocalAppData. MediaFetch leest of bewaart je wachtwoord niet en schrijft cookies niet naar settings.json of logbestanden. Met Afmelden worden de lokale sessiecookies gewist.
+
+            Download alleen video's waarvoor je toestemming of downloadrechten hebt.
+            """));
+
         tabs.TabPages.Add(CreatePage("Instellingen", """
             INSTELLINGEN
 
@@ -67,13 +92,16 @@ internal sealed class HelpDialog : Form
             Als deze optie aanstaat, bewaart ieder wachtrij-item zijn eigen doelmap. Dit maakt één downloadbatch naar meerdere mappen mogelijk. Padregels in geplakte tekst worden net als padregels in een URL-bestand verwerkt. Als de optie uitstaat, gebruikt de hele wachtrij bij Start de doelmap uit het hoofdscherm en zijn # padregels gewone opmerkingen.
 
             Clear-functionaliteit
-            Kies welke opties standaard zijn aangevinkt wanneer je op Clear drukt: Completed, Failed of Alles. Bij Alles worden de andere twee keuzes uitgeschakeld. In het bevestigingsvenster kun je de selectie voor die ene opruimactie nog aanpassen.
+            Kies welke opties standaard zijn aangevinkt wanneer je op Clear drukt: Completed, Failed, Skipped of Alles. Bij Alles worden de andere drie keuzes uitgeschakeld. In het bevestigingsvenster kun je de selectie voor die ene opruimactie nog aanpassen.
 
             Browserpreset en User-Agent
             Een preset vult een gangbare browser-User-Agent in. Je kunt deze daarna handmatig aanpassen. Dit kan helpen bij servers die verzoeken zonder herkenbare browsergegevens weigeren.
 
             Referer-URL
             Dit veld staat in het hoofdscherm en is geen permanente instelling. Vul het alleen in wanneer een server directe downloads weigert en een verwijzende webpagina verwacht.
+
+            YouTube-account
+            Aanmelden opent de officiële Google/YouTube-login in WebView2. Deze optionele sessie wordt alleen gebruikt als YouTube een anonieme streamaanvraag weigert. Afmelden wist de cookies uit het afzonderlijke MediaFetch-WebView2-profiel.
             """));
 
         tabs.TabPages.Add(CreatePage("Status en bestanden", """
@@ -90,7 +118,7 @@ internal sealed class HelpDialog : Form
 
             Dubbelklik op een bestandsnaam om de URL in de standaardbrowser te openen. Dubbelklik op een doelmap om deze in Windows Verkenner te openen. Dezelfde acties staan in het rechtermuisknopmenu. Via ✕ Verwijderen kun je een afzonderlijke regel uit de lijst halen.
 
-            Gedeeltelijke bestanden worden waar mogelijk hervat. Bij mislukte downloads probeert MediaFetch het verzoek maximaal drie keer opnieuw. Mislukte URL's worden per doelmap in failed.txt geschreven.
+            Gedeeltelijke bestanden worden waar mogelijk hervat. Bij mislukte downloads probeert MediaFetch het verzoek maximaal drie keer opnieuw. Bestandsnaam, foutmelding en URL worden per doelmap in failed.log geschreven.
 
             Een ontbrekende doelmap wordt bij Start gemeld en kan met jouw bevestiging worden aangemaakt.
             """));

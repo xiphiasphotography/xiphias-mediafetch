@@ -22,12 +22,23 @@ public class DownloadItem
 
     public bool ExistingFileIsComplete { get; set; }
 
+    public bool IsYouTube { get; set; }
+
+    public TimeSpan? MediaDuration { get; set; }
+
+    public int? ProgressOverride { get; set; }
+
+    public string? ErrorMessage { get; set; }
+
     public string Status { get; set; } = "Waiting";
 
     public int Progress
     {
         get
         {
+            if (ProgressOverride.HasValue)
+                return Math.Clamp(ProgressOverride.Value, 0, 100);
+
             if (TotalBytes is null || TotalBytes <= 0)
                 return 0;
 
