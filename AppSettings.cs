@@ -35,6 +35,12 @@ internal sealed class AppSettings
     public bool ClearSkippedByDefault { get; set; } = true;
     public bool ClearAllByDefault { get; set; }
 
+    public string FacebookFileNameTemplate { get; set; } =
+        FacebookFileNameFormatter.DefaultTemplate;
+    public bool FacebookHotToysBloggerMode { get; set; }
+    public int FacebookCounterDigits { get; set; } = 3;
+    public string? FacebookLastDestinationDirectory { get; set; }
+
     public static AppSettings Load()
     {
         try
@@ -52,6 +58,17 @@ internal sealed class AppSettings
             {
                 settings.UserAgent = DefaultUserAgent;
             }
+
+            if (string.IsNullOrWhiteSpace(settings.FacebookFileNameTemplate))
+            {
+                settings.FacebookFileNameTemplate =
+                    FacebookFileNameFormatter.DefaultTemplate;
+            }
+
+            settings.FacebookCounterDigits = Math.Clamp(
+                settings.FacebookCounterDigits,
+                1,
+                12);
 
             return settings;
         }
