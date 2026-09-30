@@ -10,6 +10,10 @@ XiPHiAS MediaFetch is een lichte Windows-app voor het gelijktijdig downloaden va
 - Verwijder optioneel voltooide downloads zodra nieuwe URL's worden toegevoegd.
 - Negeer lege regels, ongeldige regels en `#`-commentaarregels die geen volledig doelpad bevatten.
 - Download 1 tot 20 bestanden tegelijk (standaard: 4).
+- Herken Facebook-album-URL's automatisch wanneer één album-URL wordt geplakt.
+- Analyseer een Facebook-album in een afzonderlijke WebView2-sessie en voeg de grootste gevonden Facebook/CDN-afbeeldingen in albumvolgorde aan de wachtrij toe.
+- Kies per Facebook-album de doelmap en een bestandsnaam-template met `[N]`, `[E]`, `[C]` en `[X]`.
+- Gebruik optioneel de ingebouwde **Hot Toys Blogger-foto's** preset `Z[C]-FB_IMG_[X].[E]`.
 - Herken YouTube-, youtu.be- en YouTube-embed-URL's automatisch.
 - Download voor YouTube de hoogste beschikbare videoresolutie, de audio met de hoogste bitrate en de thumbnail met de hoogste resolutie.
 - Bewaar de oorspronkelijke video- en audiostream en voeg deze zonder kwaliteitsverlies asynchroon samen als MKV.
@@ -45,7 +49,7 @@ XiPHiAS MediaFetch is een lichte Windows-app voor het gelijktijdig downloaden va
 - [FFmpeg](https://ffmpeg.org/download.html) voor het samenvoegen van afzonderlijke YouTube-video- en audiostreams
 - De officiële [yt-dlp Windows executable](https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe) voor YouTube-metadata en stream-URL's
 - [Deno 2.3 of nieuwer](https://github.com/denoland/deno/releases) voor YouTubes JavaScript-challenges
-- Microsoft Edge WebView2 Runtime voor de optionele YouTube-aanmelding
+- Microsoft Edge WebView2 Runtime voor Facebook-albums en de optionele YouTube-aanmelding
 
 ## Gebruik
 
@@ -89,6 +93,76 @@ https://example.com/preview.jpg
 URL's vóór de eerste padregel gebruiken de doelmap uit het hoofdscherm. Andere regels die met `#` beginnen blijven opmerkingen. Als de instelling uitstaat, worden alle `#`-regels als opmerkingen behandeld.
 
 De bestandsnaam wordt afgeleid uit het pad van de URL. Als de URL geen bestandsnaam bevat, maakt de app een unieke naam in de vorm `download_<id>`.
+
+
+### Facebook-albums
+
+Plak één Facebook-album-URL in de wachtrij, bijvoorbeeld:
+
+```text
+https://www.facebook.com/media/set/?set=a.1427902162707125&type=3
+```
+
+MediaFetch opent eerst de Facebook-albuminstellingen. Kies daar de doelmap, de bestandsnaam-template, het startnummer en het aantal cijfers voor de counter. Daarna opent het album in een afzonderlijke WebView2-browser. Meld je daar zo nodig aan bij Facebook en klik op **Album analyseren**.
+
+MediaFetch doorloopt het album eerst om de foto-volgorde vast te leggen en opent daarna iedere foto om de grootste geladen `scontent`/`fbcdn`-variant te vinden. De gevonden directe afbeeldings-URL's worden vervolgens als normale downloads aan de bestaande wachtrij toegevoegd.
+
+De bestandsnaam-template ondersteunt:
+
+```text
+[N]  originele Facebook-bestandsnaam zonder extensie
+[E]  extensie zonder punt
+[C]  counter in albumvolgorde
+[X]  waarde uit de ingebouwde Hot Toys Blogger-regex
+```
+
+De standaardtemplate is:
+
+```text
+[N].[E]
+```
+
+Met startnummer `1` en `3` cijfers maakt `[C].[E]` bijvoorbeeld:
+
+```text
+001.jpg
+002.jpg
+003.jpg
+```
+
+De preset **Hot Toys Blogger-foto's** vult automatisch in:
+
+```text
+Z[C]-FB_IMG_[X].[E]
+```
+
+Voor:
+
+```text
+715592432_1427899362707405_8122620896771832055_n.jpg
+```
+
+wordt `[X]`:
+
+```text
+8122620896771832055
+```
+
+en de eerste foto wordt standaard:
+
+```text
+Z001-FB_IMG_8122620896771832055.jpg
+```
+
+Als het bekende Facebook-bestandsnaampatroon niet wordt herkend, valt `[X]` veilig terug op `[N]`. De laatst gebruikte Facebook-template, doelmap, Hot Toys-keuze en het aantal cijfers worden onthouden. Een nieuw album begint standaard weer bij startnummer `1`.
+
+De Facebook-sessie wordt afzonderlijk opgeslagen onder:
+
+```text
+%LOCALAPPDATA%\XiPHiAS\MediaFetch\WebView2\Facebook
+```
+
+MediaFetch bewaart geen Facebook-wachtwoord in `settings.json`. Facebook kan de webinterface en afbeeldingsstructuur wijzigen; deze eerste beta gebruikt daarom de daadwerkelijk in de browser geladen album- en afbeeldingsgegevens in plaats van een vaste private API.
 
 ### YouTube
 
@@ -140,6 +214,7 @@ Via **Help > Handleiding** opent een helpvenster met afzonderlijke tabbladen voo
 - downloaden naar meerdere doelmappen;
 - uitleg van alle instellingen;
 - downloadstatussen en bestandsafhandeling.
+- Facebook-albums, bestandsnaamtemplates en de Hot Toys Blogger-preset;
 - YouTube-downloads, bronbestanden, thumbnails en FFmpeg-samenvoeging.
 
 **Help > Over XiPHiAS MediaFetch** toont versie- en projectinformatie.
