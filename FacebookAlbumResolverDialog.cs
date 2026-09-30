@@ -228,7 +228,8 @@ internal sealed class FacebookAlbumResolverDialog : Form
 
             foreach (var link in DeserializeStringArray(result))
             {
-                if (seen.Add(link))
+                var key = GetPhotoKey(link);
+                if (seen.Add(key))
                     links.Add(link);
             }
 
@@ -354,6 +355,27 @@ internal sealed class FacebookAlbumResolverDialog : Form
         });
 
         await completion.Task;
+    }
+
+    private static string GetPhotoKey(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return url;
+
+        var query = uri.Query.TrimStart('?')
+            .Split('&', StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var part in query)
+        {
+            var pair = part.Split('=', 2);
+            if (pair.Length == 2 &&
+                pair[0].Equals("fbid", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"fbid:{Uri.UnescapeDataString(pair[1])}";
+            }
+        }
+
+        return uri.GetLeftPart(UriPartial.Path).TrimEnd('/');
     }
 
     private static List<string> DeserializeStringArray(string json)
