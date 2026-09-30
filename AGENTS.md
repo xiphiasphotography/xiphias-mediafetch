@@ -174,6 +174,63 @@ For Facebook support specifically, do not depend on obsolete filename tricks suc
 
 If browser automation is introduced, keep browser/session handling isolated from `Downloader` and avoid storing Facebook credentials in the application.
 
+
+## Facebook album filename templates
+
+Facebook album downloads use a configurable filename template rather than a simple prefix.
+
+Supported placeholders:
+
+- `[N]` — original Facebook filename without extension.
+- `[E]` — original extension without the leading dot.
+- `[C]` — sequential album counter.
+- `[X]` — value extracted from the original filename by the configured Facebook-specific regex rule.
+
+Counter behavior:
+
+- The counter follows Facebook album order, not asynchronous resolver/download completion order.
+- The start value is configurable per album and defaults to `1`.
+- The number of digits controls leading zeroes and defaults to `3`.
+- Example: start `1`, digits `3` produces `001`, `002`, …, `010`, …, `100`.
+
+The normal default filename template is:
+
+```text
+[N].[E]
+```
+
+The built-in **Hot Toys Blogger photos** preset uses:
+
+```text
+Z[C]-FB_IMG_[X].[E]
+```
+
+For the Facebook filename:
+
+```text
+715592432_1427899362707405_8122620896771832055_n.jpg
+```
+
+the Hot Toys Blogger regex extracts:
+
+```text
+8122620896771832055
+```
+
+and with counter `001` the result is:
+
+```text
+Z001-FB_IMG_8122620896771832055.jpg
+```
+
+The Hot Toys Blogger extraction rule is built in and must not require the user to enter a regex. The template remains editable after selecting the preset.
+
+If a template uses `[X]` but the built-in extraction rule does not match a filename, fall back safely to `[N]` for that placeholder rather than skipping or failing the photo.
+
+The Facebook album dialog should also ask for the destination folder. Remember the last-used Facebook filename settings and destination folder where appropriate, but reset the counter start value to `1` for each new album. Keep the default digit count at `3`.
+
+Do not assign counters while network requests complete. Resolve/discover the album first, preserve album order, then apply filename templates and create download queue items.
+
 ## Networking and cancellation
 
 - Reuse `HttpClient` for a downloader lifetime; do not create one client per chunk or request.
