@@ -4,6 +4,7 @@ obj/
 publish/
 Release/
 Samples/
+tools/
 .vs/
 .vscode/
 *.user
