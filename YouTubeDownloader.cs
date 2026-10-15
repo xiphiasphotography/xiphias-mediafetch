@@ -130,7 +130,8 @@ internal sealed class YouTubeDownloader : IDisposable
         };
         foreach (var arg in new[] { "--no-playlist", "--no-warnings",
             "--dump-single-json", "--skip-download", "--js-runtimes",
-            $"deno:{deno}", "-f", "bestvideo+bestaudio/best" })
+            $"deno:{deno}", "-f",
+            "bestvideo[protocol^=https]+bestaudio[protocol^=https]/best[protocol^=https]" })
             info.ArgumentList.Add(arg);
         if (cookiePath is not null)
         {
